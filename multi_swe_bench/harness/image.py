@@ -34,6 +34,12 @@ class Config:
 
 
 class Image:
+    # Deprecated Debian images that need archive repository fix
+    DEPRECATED_DEBIAN_IMAGES = [
+        "gcc:4", "gcc:5", "gcc:6", "gcc:7", "gcc:8",
+        "debian:buster", "debian:stretch", "debian:jessie",
+    ]
+
     def __lt__(self, other: "Image") -> bool:
         return self.image_full_name() < other.image_full_name()
 
@@ -117,8 +123,134 @@ class Image:
     def dockerfile_name(self) -> str:
         return "Dockerfile"
 
+    def extra_packages(self) -> list[str]:
+        """Override this method to add extra apt packages for this repo."""
+        return []
+
+    def extra_setup(self) -> str:
+        """Override this method to add extra setup commands after git checkout."""
+        return ""
+
+    def _is_deprecated_debian(self, base_img: str) -> bool:
+        """Check if the base image uses a deprecated Debian version."""
+        for deprecated in self.DEPRECATED_DEBIAN_IMAGES:
+            if base_img.startswith(deprecated):
+                return True
+        return False
+
+    def _get_apt_update_command(self, packages_str: str, base_img: str) -> str:
+        """Generate the apt-get update and install command."""
+        if self._is_deprecated_debian(base_img):
+            # Fix for deprecated Debian repositories (buster, stretch, jessie)
+            return f"""RUN sed -i 's|deb.debian.org/debian|archive.debian.org/debian|g' /etc/apt/sources.list && \\
+    sed -i 's|security.debian.org/debian-security|archive.debian.org/debian-security|g' /etc/apt/sources.list && \\
+    sed -i '/stretch-updates/d' /etc/apt/sources.list && \\
+    sed -i '/buster-updates/d' /etc/apt/sources.list && \\
+    apt-get update && apt-get install -y --no-install-recommends \\
+    {packages_str} \\
+    && rm -rf /var/lib/apt/lists/*"""
+        else:
+            return f"""RUN apt-get update && apt-get install -y --no-install-recommends \\
+    {packages_str} \\
+    && rm -rf /var/lib/apt/lists/*"""
+
     def dockerfile(self) -> str:
-        raise NotImplementedError
+        """Generate Dockerfile with standard format. Repos can override if needed."""
+        # Get base image from dependency()
+        base_img = self.dependency()
+        if isinstance(base_img, Image):
+            # If dependency returns an Image, this is not a base image class
+            # Return empty - subclass should override
+            raise NotImplementedError("Subclass must override dockerfile() or return a string from dependency()")
+
+        repo_url = f"https://github.com/{self.pr.org}/{self.pr.repo}.git"
+        base_commit = self.pr.base.sha
+
+        # Default packages
+        default_packages = [
+            "ca-certificates",
+            "curl",
+            "g++",
+            "git",
+            "gnupg",
+            "make",
+            "python3",
+            "sudo",
+            "wget",
+        ]
+
+        # Combine with extra packages
+        all_packages = default_packages + self.extra_packages()
+        packages_str = " \\\n    ".join(all_packages)
+
+        # Get apt update command (with deprecated debian fix if needed)
+        apt_command = self._get_apt_update_command(packages_str, base_img)
+
+        # Extra setup commands
+        extra_setup = self.extra_setup()
+        extra_setup_section = f"\n{extra_setup}\n" if extra_setup else ""
+
+        return f"""# syntax=docker/dockerfile:1.6
+
+FROM {base_img}
+
+
+ARG TARGETARCH
+ARG REPO_URL="{repo_url}"
+ARG BASE_COMMIT
+
+
+ARG http_proxy=""
+ARG https_proxy=""
+ARG HTTP_PROXY=""
+ARG HTTPS_PROXY=""
+ARG no_proxy="localhost,127.0.0.1,::1"
+ARG NO_PROXY="localhost,127.0.0.1,::1"
+ARG CA_CERT_PATH="/etc/ssl/certs/ca-certificates.crt"
+
+ENV DEBIAN_FRONTEND=noninteractive \\
+    LANG=C.UTF-8 \\
+    http_proxy=${{http_proxy}} \\
+    https_proxy=${{https_proxy}} \\
+    HTTP_PROXY=${{HTTP_PROXY}} \\
+    HTTPS_PROXY=${{HTTPS_PROXY}} \\
+    no_proxy=${{NO_PROXY}} \\
+    SSL_CERT_FILE=${{CA_CERT_PATH}} \\
+    REQUESTS_CA_BUNDLE=${{CA_CERT_PATH}} \\
+    CURL_CA_BUNDLE=${{CA_CERT_PATH}}
+
+
+LABEL org.opencontainers.image.title="{self.pr.org}/{self.pr.repo}" \\
+      org.opencontainers.image.description="{self.pr.org}/{self.pr.repo} Docker image" \\
+      org.opencontainers.image.source="https://github.com/{self.pr.org}/{self.pr.repo}" \\
+      org.opencontainers.image.authors="https://www.ethara.ai/"
+
+
+{apt_command}
+
+
+RUN mkdir -p /etc/pki/tls/certs /etc/pki/ca-trust/extracted/pem && \\
+    ln -sf /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt && \\
+    ln -sf /etc/ssl/certs/ca-certificates.crt /etc/ssl/cert.pem && \\
+    ln -sf /etc/ssl/certs/ca-certificates.crt /etc/ssl/ca-bundle.pem
+
+
+RUN --mount=type=secret,id=mitm_ca,required=0 \\
+    if [ -f /run/secrets/mitm_ca ]; then \\
+        cp /run/secrets/mitm_ca /usr/local/share/ca-certificates/mitm-ca.crt && update-ca-certificates; \\
+    fi
+
+
+RUN git clone "${{REPO_URL}}" /home/{self.pr.repo}
+
+WORKDIR /home/{self.pr.repo}
+
+RUN git reset --hard
+RUN git checkout ${{BASE_COMMIT}}
+{extra_setup_section}
+
+CMD ["/bin/bash"]
+"""
 
 
 class SWEImageDefault(Image):
