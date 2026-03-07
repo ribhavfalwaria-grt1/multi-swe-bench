@@ -81,36 +81,45 @@ echo 'export PATH="/root/.local/bin:$PATH" && poetry run pytest -v' > test_comma
                 ".",
                 "run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
+cd /home/OpenHands
 export PATH="/root/.local/bin:$PATH"
 poetry run pytest -v
-""".format(pr=self.pr),
+echo "###VITEST_JSON_START###"
+cd /home/OpenHands/frontend && npx vitest run --reporter=json 2>/dev/null || true
+echo "###VITEST_JSON_END###"
+""",
             ),
             File(
                 ".",
                 "test-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1
 fi
 export PATH="/root/.local/bin:$PATH"
 poetry run pytest -v
-""".format(pr=self.pr),
+echo "###VITEST_JSON_START###"
+cd /home/OpenHands/frontend && npx vitest run --reporter=json 2>/dev/null || true
+echo "###VITEST_JSON_END###"
+""",
             ),
             File(
                 ".",
                 "fix-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch /home/fix.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
     exit 1
 fi
 export PATH="/root/.local/bin:$PATH"
 poetry run pytest -v
-""".format(pr=self.pr),
+echo "###VITEST_JSON_START###"
+cd /home/OpenHands/frontend && npx vitest run --reporter=json 2>/dev/null || true
+echo "###VITEST_JSON_END###"
+""",
             ),
         ]
 
@@ -177,14 +186,39 @@ class OPENHANDS_9911_TO_9214(Instance):
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
 
-        pattern = r"([^\s]+)\s+(PASSED|FAILED|SKIPPED|ERROR)\s+\["
-        for test_name, status in re.findall(pattern, log):
+        # --- pytest parser: "test_name PASSED/FAILED/SKIPPED/ERROR [ xx%]" ---
+        pytest_pattern = r"([^\s]+)\s+(PASSED|FAILED|SKIPPED|ERROR)\s+\["
+        for test_name, status in re.findall(pytest_pattern, log):
             if status == "PASSED":
                 passed_tests.add(test_name)
             elif status in ("FAILED", "ERROR"):
                 failed_tests.add(test_name)
             elif status == "SKIPPED":
                 skipped_tests.add(test_name)
+
+        # --- vitest JSON parser ---
+        vitest_start = "###VITEST_JSON_START###"
+        vitest_end = "###VITEST_JSON_END###"
+        start_idx = log.find(vitest_start)
+        end_idx = log.find(vitest_end)
+        if start_idx != -1 and end_idx != -1:
+            json_str = log[start_idx + len(vitest_start) : end_idx].strip()
+            try:
+                import json
+
+                vitest_data = json.loads(json_str)
+                for suite in vitest_data.get("testResults", []):
+                    for assertion in suite.get("assertionResults", []):
+                        test_name = f"vitest::{assertion.get('fullName', assertion.get('title', 'unknown'))}"
+                        status = assertion.get("status", "")
+                        if status == "passed":
+                            passed_tests.add(test_name)
+                        elif status == "failed":
+                            failed_tests.add(test_name)
+                        elif status in ("pending", "skipped", "todo"):
+                            skipped_tests.add(test_name)
+            except (json.JSONDecodeError, KeyError, TypeError):
+                pass
 
         return TestResult(
             passed_count=len(passed_tests),

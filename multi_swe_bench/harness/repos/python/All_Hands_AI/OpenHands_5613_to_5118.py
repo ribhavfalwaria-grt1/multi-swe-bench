@@ -83,36 +83,36 @@ bash test_commands.sh""",
                 ".",
                 "run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
+cd /home/OpenHands
 poetry run pytest -v ./tests/unit/ -k "not test_runtime_build"
 
-""".format(pr=self.pr),
+""",
             ),
             File(
                 ".",
                 "test-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
 poetry run pytest -v ./tests/unit/ -k "not test_runtime_build"
 
-""".format(pr=self.pr),
+""",
             ),
             File(
                 ".",
                 "fix-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
 poetry run pytest -v ./tests/unit/ -k "not test_runtime_build"
 
-""".format(pr=self.pr),
+""",
             ),
         ]
 

@@ -153,7 +153,7 @@ sed -i '1i export OPENDevin_RUNTIME=docker' test_commands.sh
                 ".",
                 "run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
+cd /home/OpenHands
 export OPENDevin_RUNTIME=docker
 export DOCKER_ENABLED=true
 export PROJECT_ROOT="/home/OpenHands"
@@ -161,14 +161,14 @@ export SCRIPT_DIR="/home/OpenHands"
 export WORKSPACE_BASE="/home/OpenHands/workspace"
 poetry run pytest --verbose ./tests/
 
-""".format(pr=self.pr),
+""",
             ),
             File(
                 ".",
                 "test-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
@@ -179,14 +179,14 @@ export SCRIPT_DIR="/home/OpenHands"
 export WORKSPACE_BASE="/home/OpenHands/workspace"
 poetry run pytest --verbose ./tests/
 
-""".format(pr=self.pr),
+""",
             ),
             File(
                 ".",
                 "fix-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
@@ -197,7 +197,7 @@ export SCRIPT_DIR="/home/OpenHands"
 export WORKSPACE_BASE="/home/OpenHands/workspace"
 poetry run pytest --verbose ./tests/
 
-""".format(pr=self.pr),
+""",
             ),
         ]
 

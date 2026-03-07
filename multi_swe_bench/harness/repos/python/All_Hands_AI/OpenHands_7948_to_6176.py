@@ -113,36 +113,42 @@ echo 'poetry run pytest -v' > test_commands.sh""",
                 ".",
                 "run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
+cd /home/OpenHands
 poetry run pytest -v
-
-""".format(pr=self.pr),
+echo "###VITEST_JSON_START###"
+cd /home/OpenHands/frontend && npx vitest run --reporter=json 2>/dev/null || true
+echo "###VITEST_JSON_END###"
+""",
             ),
             File(
                 ".",
                 "test-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
 poetry run pytest -v
-
-""".format(pr=self.pr),
+echo "###VITEST_JSON_START###"
+cd /home/OpenHands/frontend && npx vitest run --reporter=json 2>/dev/null || true
+echo "###VITEST_JSON_END###"
+""",
             ),
             File(
                 ".",
                 "fix-run.sh",
                 """#!/bin/bash
-cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+cd /home/OpenHands
+if ! git -C /home/OpenHands apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
 poetry run pytest -v
-
-""".format(pr=self.pr),
+echo "###VITEST_JSON_START###"
+cd /home/OpenHands/frontend && npx vitest run --reporter=json 2>/dev/null || true
+echo "###VITEST_JSON_END###"
+""",
             ),
         ]
 
@@ -220,13 +226,13 @@ class OPENHANDS_7948_TO_6176(Instance):
 
     def parse_log(self, log: str) -> TestResult:
         # Parse the log content and extract test execution results.
-        passed_tests: set[str] = set()  # Tests that passed successfully
-        failed_tests: set[str] = set()  # Tests that failed
-        skipped_tests: set[str] = set()  # Tests that were skipped
+        passed_tests: set[str] = set()
+        failed_tests: set[str] = set()
+        skipped_tests: set[str] = set()
         import re
         import json
 
-        # Regex pattern to match test cases and their status
+        # --- pytest parser ---
         pattern = r"([^\s]+)\s+([A-Z]+)\s+\["
         matches = re.findall(pattern, log)
         for test, status in matches:
@@ -236,11 +242,26 @@ class OPENHANDS_7948_TO_6176(Instance):
                 failed_tests.add(test)
             elif status == "SKIPPED":
                 skipped_tests.add(test)
-        parsed_results = {
-            "passed_tests": passed_tests,
-            "failed_tests": failed_tests,
-            "skipped_tests": skipped_tests,
-        }
+
+        # --- vitest parser ---
+        for line in log.splitlines():
+            stripped = line.strip()
+            vt_pass = re.match(r"[✓✔]\s+(.+?)(?:\s+\d+\s*ms)?$", stripped)
+            if vt_pass:
+                passed_tests.add(f"vitest::{vt_pass.group(1).strip()}")
+                continue
+            vt_fail = re.match(r"[✗✘×xX]\s+(.+?)(?:\s+\d+\s*ms)?$", stripped)
+            if vt_fail:
+                failed_tests.add(f"vitest::{vt_fail.group(1).strip()}")
+                continue
+            vt_fail2 = re.match(r"FAIL\s+(.+\.(?:test|spec)\.\w+)", stripped)
+            if vt_fail2:
+                failed_tests.add(f"vitest::{vt_fail2.group(1).strip()}")
+                continue
+            vt_skip = re.match(r"[↓⊘]\s+(.+?)(?:\s+\d+\s*ms)?$", stripped)
+            if vt_skip:
+                skipped_tests.add(f"vitest::{vt_skip.group(1).strip()}")
+                continue
 
         return TestResult(
             passed_count=len(passed_tests),
