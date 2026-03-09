@@ -285,3 +285,5 @@ Tested on `pallets/flask`:
 4. **Date fallback only when compare returns zero commits.** If compare returned commits but none matched a PR, the tag range likely belongs to a different lineage. Assigning temporally-coincident PRs would be incorrect.
 
 5. **All sort keys use a scheme-discriminator prefix.** `(0, ...)` for semver, `(1, ...)` for calver, `(2, ...)` for unknown — prevents Python `TypeError` when comparing mixed-scheme tuples.
+
+6. **Minimum 2 PRs per bundle.** Single-PR version ranges are excluded from LHT bundles (`_MIN_PRS_PER_BUNDLE = 2` in `group_prs_by_tags.py`). A single PR between two tags doesn't constitute a meaningful "long horizon" task — it's better served by the standard SWE pipeline.

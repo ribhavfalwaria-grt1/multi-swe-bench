@@ -38,6 +38,8 @@ Multi-layered strategy:
         3rd       git cherry detection (cherry-picked PRs)
         4th       Date-range fallback (last resort)
 
+    Bundles with fewer than _MIN_PRS_PER_BUNDLE PRs are excluded.
+
 Outputs: {org}__{repo}_tag_groups.jsonl — one record per bundle:
     {
         "base_tag": "v1.0.0",
@@ -71,6 +73,9 @@ _COMPARE_COMMITS_CAP = 250
 
 # Default timeout for git commands (seconds)
 _GIT_TIMEOUT = 120
+
+# Minimum number of PRs required per version-tag pair to form a valid LHT bundle
+_MIN_PRS_PER_BUNDLE = 2
 
 # PR number extraction patterns for merge commit messages
 _PR_NUMBER_PATTERNS = [
@@ -497,6 +502,40 @@ def _collect_prs_for_pair(
     return found, methods
 
 
+def _maybe_emit_group(
+    base_tag: dict,
+    head_tag: dict,
+    release_line: str,
+    pr_by_sha: dict[str, list[dict]],
+    pr_by_number: dict[int, dict],
+    all_prs: list[dict],
+    assigned_pr_numbers: set[int],
+    repo_path: Optional[Path],
+    tokens: list[str],
+    org: str,
+    repo: str,
+    groups: list[dict],
+    existing_pairs: set[tuple[str, str]],
+) -> None:
+    """Collect PRs for a tag pair and append to groups if threshold met."""
+    pr_numbers, methods = _collect_prs_for_pair(
+        base_tag, head_tag, pr_by_sha, pr_by_number,
+        all_prs, assigned_pr_numbers, repo_path, tokens, org, repo,
+    )
+    if len(pr_numbers) >= _MIN_PRS_PER_BUNDLE:
+        assigned_pr_numbers.update(pr_numbers)
+        existing_pairs.add((base_tag["sha"], head_tag["sha"]))
+        groups.append({
+            "base_tag": base_tag["name"],
+            "head_tag": head_tag["name"],
+            "base_sha": base_tag["sha"],
+            "head_sha": head_tag["sha"],
+            "pr_numbers": sorted(pr_numbers),
+            "release_line": release_line,
+            "attribution_methods": methods,
+        })
+
+
 # ---------------------------------------------------------------------------
 # Fallback: time-window grouping (unchanged from original)
 # ---------------------------------------------------------------------------
@@ -539,12 +578,12 @@ def _group_by_time_window(
             ):
                 current_group.append(branch_prs[i])
             else:
-                if len(current_group) >= 2:
+                if len(current_group) >= _MIN_PRS_PER_BUNDLE:
                     _emit_time_window_group(groups, current_group)
                 current_group = [branch_prs[i]]
                 group_start = curr_date
 
-        if len(current_group) >= 2:
+        if len(current_group) >= _MIN_PRS_PER_BUNDLE:
             _emit_time_window_group(groups, current_group)
 
     return groups
@@ -673,65 +712,23 @@ def main(
                         continue
 
                     # Layer 4: Tiered PR attribution
-                    pr_numbers, methods = _collect_prs_for_pair(
-                        base_tag,
-                        head_tag,
-                        pr_by_sha,
-                        pr_by_number,
-                        prs,
-                        assigned_pr_numbers,
-                        repo_path,
-                        tokens,
-                        org,
-                        repo,
+                    _maybe_emit_group(
+                        base_tag, head_tag, line,
+                        pr_by_sha, pr_by_number, prs,
+                        assigned_pr_numbers, repo_path, tokens,
+                        org, repo, groups, existing_pairs,
                     )
-
-                    if pr_numbers:
-                        for n in pr_numbers:
-                            assigned_pr_numbers.add(n)
-                        existing_pairs.add((base_sha, head_sha))
-                        groups.append(
-                            {
-                                "base_tag": base_tag["name"],
-                                "head_tag": head_tag["name"],
-                                "base_sha": base_sha,
-                                "head_sha": head_sha,
-                                "pr_numbers": sorted(pr_numbers),
-                                "release_line": line,
-                                "attribution_methods": methods,
-                            }
-                        )
 
             # Cross-release-line pairs (e.g., v1.9.5 → v2.0.0)
             all_sorted = sorted(filtered_tags, key=lambda t: t.get("sort_key", ()))
             cross_pairs = _find_cross_line_pairs(all_sorted, existing_pairs, repo_path)
             for base_tag, head_tag, cross_line in cross_pairs:
-                pr_numbers, methods = _collect_prs_for_pair(
-                    base_tag,
-                    head_tag,
-                    pr_by_sha,
-                    pr_by_number,
-                    prs,
-                    assigned_pr_numbers,
-                    repo_path,
-                    tokens,
-                    org,
-                    repo,
+                _maybe_emit_group(
+                    base_tag, head_tag, cross_line,
+                    pr_by_sha, pr_by_number, prs,
+                    assigned_pr_numbers, repo_path, tokens,
+                    org, repo, groups, existing_pairs,
                 )
-                if pr_numbers:
-                    for n in pr_numbers:
-                        assigned_pr_numbers.add(n)
-                    groups.append(
-                        {
-                            "base_tag": base_tag["name"],
-                            "head_tag": head_tag["name"],
-                            "base_sha": base_tag["sha"],
-                            "head_sha": head_tag["sha"],
-                            "pr_numbers": sorted(pr_numbers),
-                            "release_line": cross_line,
-                            "attribution_methods": methods,
-                        }
-                    )
 
             print(f"Version-range grouping produced {len(groups)} groups")
 
