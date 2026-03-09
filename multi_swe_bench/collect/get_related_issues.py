@@ -72,7 +72,7 @@ def main(tokens, out_dir: Path, filtered_prs_file: Path):
     print(f"Tokens: {tokens}")
     print(f"Pull file: {filtered_prs_file}")
 
-    org_repo_re = re.compile(r"(.+)__(.+)_filtered_prs.jsonl")
+    org_repo_re = re.compile(r"(.+)__(.+?)_(?:lht_)?filtered_prs.jsonl")
     m = org_repo_re.match(filtered_prs_file.name)
     if not m:
         print(f"Error: Invalid pull file name: {filtered_prs_file.name}")
@@ -87,34 +87,47 @@ def main(tokens, out_dir: Path, filtered_prs_file: Path):
         filtered_prs = [json.loads(line) for line in file]
         target_issues = set()
         for pr in filtered_prs:
-            for issue in pr["resolved_issues"]:
-                target_issues.add(issue)
+            for issue in pr.get("resolved_issues", []):
+                if isinstance(issue, int):
+                    target_issues.add(issue)
+                elif isinstance(issue, dict):
+                    num = issue.get("number")
+                    if num is not None:
+                        target_issues.add(num)
+
+    if not target_issues:
+        print("No resolved issues to fetch. Writing empty file.")
+        out_file_path = out_dir / f"{org}__{repo}_related_issues.jsonl"
+        out_file_path.write_text("")
+        return
 
     g = get_github(random.choice(tokens))
     r = g.get_repo(f"{org}/{repo}")
 
+    print(f"Fetching {len(target_issues)} specific issues by number...")
+
     with open(
         out_dir / f"{org}__{repo}_related_issues.jsonl", "w", encoding="utf-8"
     ) as out_file:
-        for issue in tqdm(r.get_issues(state="all"), desc="Issues"):
-            if issue.number not in target_issues:
-                continue
-
-            out_file.write(
-                json.dumps(
-                    {
-                        "org": org,
-                        "repo": repo,
-                        "number": issue.number,
-                        "state": issue.state,
-                        "title": issue.title,
-                        "body": issue.body,
-                    },
-                    ensure_ascii=False,
+        for issue_num in tqdm(sorted(target_issues), desc="Fetching issues"):
+            try:
+                issue = r.get_issue(issue_num)
+                out_file.write(
+                    json.dumps(
+                        {
+                            "org": org,
+                            "repo": repo,
+                            "number": issue.number,
+                            "state": issue.state,
+                            "title": issue.title,
+                            "body": issue.body,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n",
                 )
-                + "\n",
-            )
-
+            except Exception as e:
+                print(f"  Warning: could not fetch issue #{issue_num}: {e}")
 
 if __name__ == "__main__":
     parser = get_parser()

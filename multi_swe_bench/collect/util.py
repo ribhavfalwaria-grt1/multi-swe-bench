@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -34,6 +35,37 @@ def parse_tokens(tokens: str | list[str] | Path) -> list[str]:
     return []
 
 
+def _load_env_tokens() -> list[str]:
+    """Load tokens from a .env file (GITHUB_TOKENS=... or GITHUB_TOKEN=...)."""
+    # Walk up from cwd to find a .env file
+    for directory in [Path.cwd()] + list(Path.cwd().parents):
+        env_file = directory / ".env"
+        if env_file.is_file():
+            break
+    else:
+        return []
+
+    tokens: list[str] = []
+    with env_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            # Strip optional quotes
+            value = value.strip().strip('"').strip("'")
+            if key in ("GITHUB_TOKENS", "GITHUB_TOKEN", "GH_TOKEN"):
+                # Support comma-separated and newline-separated
+                for tok in value.split(","):
+                    tok = tok.strip()
+                    if tok:
+                        tokens.append(tok)
+    return tokens
+
+
 def find_default_token_file() -> Path:
     """
     Try to find a default token file in the current directory.
@@ -50,9 +82,23 @@ def find_default_token_file() -> Path:
 
 def get_tokens(tokens) -> list[str]:
     if tokens is None:
+        # Try .env file first, then token files
+        env_tokens = _load_env_tokens()
+        if env_tokens:
+            print(f"Loaded {len(env_tokens)} token(s) from .env file")
+            return env_tokens
+
         default_token_file = find_default_token_file()
         if default_token_file is None:
-            print("Error: No tokens provided and no default token file found.")
+            # Last resort: check environment variables directly
+            for var in ("GITHUB_TOKENS", "GITHUB_TOKEN", "GH_TOKEN"):
+                val = os.environ.get(var, "").strip()
+                if val:
+                    env_list = [t.strip() for t in val.split(",") if t.strip()]
+                    if env_list:
+                        print(f"Loaded {len(env_list)} token(s) from ${var}")
+                        return env_list
+            print("Error: No tokens provided. Pass --tokens, set GITHUB_TOKENS in .env, or create a tokens file.")
             sys.exit(1)
         tokens = default_token_file
     else:
