@@ -49,8 +49,6 @@ WORKDIR /home/
 
 {code}
 
-RUN apt update && apt install -y protobuf-compiler pkg-config libssl-dev
-
 {self.clear_env}
 
 """
@@ -123,7 +121,7 @@ bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
 
-cargo test || true
+cargo test --locked || true
 
 """.format(pr=self.pr),
             ),
@@ -134,7 +132,7 @@ cargo test || true
 set -e
 
 cd /home/{pr.repo}
-cargo test
+cargo test --locked
 
 """.format(pr=self.pr),
             ),
