@@ -40,6 +40,7 @@ def build(
     buildargs: dict[str, str] | None = None,
     platform: str | None = None,
     output_tar: Path | None = None,
+    base_image_context: str | None = None,
 ):
     workdir = str(workdir)
     logger.info(
@@ -60,6 +61,7 @@ def build(
             buildargs=buildargs,
             platform=platform,
             output_tar=abs_output_tar,
+            base_image_context=base_image_context,
         )
     else:
         # --- Legacy single-arch path: use Python Docker SDK (unchanged) ---
@@ -169,6 +171,7 @@ def _build_with_buildx(
     buildargs: dict[str, str] | None = None,
     platform: str = "linux/amd64",
     output_tar: Path | None = None,
+    base_image_context: str | None = None,
 ):
     """Multi-arch build using docker buildx subprocess.
 
@@ -199,6 +202,10 @@ def _build_with_buildx(
     for key, value in (buildargs or {}).items():
         cmd.extend(["--build-arg", f"{key}={value}"])
 
+    # Add base image context for resolving locally-built base images via OCI layout
+    if base_image_context:
+        cmd.extend(["--build-context", base_image_context])
+
     # Output strategy:
     #   - output_tar + single platform: OCI tar AND --load in one command
     #   - output_tar + multi platform:  OCI tar only (--load in second pass below)
@@ -214,6 +221,17 @@ def _build_with_buildx(
 
     _run_buildx(cmd, workdir, logger)
     logger.info(f"image({workdir}) buildx success: {image_full_name}")
+
+    # Extract OCI tar to a directory so downstream builds can reference it
+    # via --build-context with oci-layout:// protocol.
+    if output_tar:
+        oci_dir = Path(str(output_tar) + ".d")
+        oci_dir.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            ["tar", "-xf", str(output_tar), "-C", str(oci_dir)],
+            check=True,
+        )
+        logger.info(f"Extracted OCI tar to {oci_dir}")
 
     # --- Second pass for multi-platform + output_tar ---
     # The first build exported a multi-arch OCI tar but could NOT use --load
@@ -241,6 +259,8 @@ def _build_with_buildx(
         ]
         for key, value in (buildargs or {}).items():
             load_cmd.extend(["--build-arg", f"{key}={value}"])
+        if base_image_context:
+            load_cmd.extend(["--build-context", base_image_context])
         load_cmd.append("--load")
         load_cmd.append(".")
 

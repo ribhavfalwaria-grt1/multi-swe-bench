@@ -645,6 +645,13 @@ class CliArgs:
                 buildargs["BASE_COMMIT"] = image.pr.base.sha
 
         self.logger.info(f"Building image {image.image_full_name()}...")
+        base_image_context = None
+        dep_img = image.dependency()
+        if isinstance(dep_img, Image) and self.output_tar:
+            safe_dep_name = dep_img.image_full_name().replace("/", "_").replace(":", "_")
+            oci_dir = self.output_tar / f"{safe_dep_name}.tar.d"
+            if oci_dir.exists():
+                base_image_context = f"{dep_img.image_full_name()}=oci-layout://{oci_dir.resolve()}"
         docker_util.build(
             image_dir,
             image.dockerfile_name(),
@@ -658,6 +665,7 @@ class CliArgs:
             buildargs=buildargs,
             platform=self.platform,
             output_tar=per_image_tar,
+            base_image_context=base_image_context,
         )
         self.logger.info(f"Image {image.image_full_name()} built successfully.")
 
