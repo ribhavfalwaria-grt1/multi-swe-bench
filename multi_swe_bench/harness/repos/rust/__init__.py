@@ -10,4 +10,5 @@ from multi_swe_bench.harness.repos.rust.rusqlite import *
 from multi_swe_bench.harness.repos.rust.rust_lang import *
 from multi_swe_bench.harness.repos.rust.serde_rs import *
 from multi_swe_bench.harness.repos.rust.sharkdp import *
+from multi_swe_bench.harness.repos.rust.tailcallhq import *
 from multi_swe_bench.harness.repos.rust.tokio_rs import *
