@@ -134,8 +134,8 @@ RUN git checkout {pr.base.sha}
         return dockerfile_content.format(pr=self.pr)
 
 
-@Instance.register("stakwork", "sphinx_tribes_frontend_63_to_36")
-class SPHINX_TRIBES_FRONTEND_63_TO_36(Instance):
+@Instance.register("stakwork", "sphinx_tribes_frontend")
+class SPHINX_TRIBES_FRONTEND(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
