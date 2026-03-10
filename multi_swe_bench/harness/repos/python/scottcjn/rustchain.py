@@ -37,6 +37,14 @@ class ImageDefault(Image):
     def extra_setup(self) -> str:
         return "RUN pip install --no-cache-dir pytest requests"
 
+    def dockerfile(self) -> str:
+        base = super().dockerfile()
+        copy_commands = "\n".join(f"COPY {f.name} /home/" for f in self.files())
+        return base.replace(
+            'CMD ["/bin/bash"]',
+            f'{copy_commands}\nRUN bash /home/prepare.sh\n\nCMD ["/bin/bash"]',
+        )
+
     def files(self) -> list[File]:
         return [
             File(
