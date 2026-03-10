@@ -97,3 +97,4 @@ from multi_swe_bench.harness.repos.typescript.NomicFoundation import *
 from multi_swe_bench.harness.repos.typescript.Effect_TS import *
 from multi_swe_bench.harness.repos.typescript.stakwork import *
 from multi_swe_bench.harness.repos.typescript.thenewboston_blockchain import *
+from multi_swe_bench.harness.repos.typescript.tscircuit import *
