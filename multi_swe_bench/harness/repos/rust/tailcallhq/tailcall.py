@@ -20,7 +20,7 @@ class TailcallImageBase(Image):
         return self._config
 
     def dependency(self) -> Union[str, "Image"]:
-        return "rust:latest"
+        return "rust:1.82"
 
     def image_tag(self) -> str:
         return "base"
@@ -121,8 +121,36 @@ bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
 
-export DOCS_RS=1
-cargo test --locked || true
+# Downgrade proc-macro2 to 1.0.85 to fix proc-macro-error compilation
+# proc-macro2 >= 1.0.86 removed From<proc_macro::Span> that proc-macro-error depends on
+cargo update -p proc-macro2 --precise 1.0.85 2>&1 || true
+
+# Downgrade time to 0.3.35 to fix compilation on newer Rust
+# time 0.3.36 has compilation issues with certain Rust versions
+cargo update -p time --precise 0.3.35 2>&1 || true
+
+# Install cmake (needed for some PRs that depend on it)
+apt-get update -qq && apt-get install -y -qq cmake 2>&1 || true
+
+# First attempt — downloads all dependencies (may fail on apollo-tracing agent_id)
+cargo test 2>&1 || true
+
+# Patch async-graphql-extension-apollo-tracing to add missing agent_id field
+# Search both registry and git checkouts with flexible name matching (hyphens or underscores)
+for APOLLO_SRC in $(find /usr/local/cargo/registry/src /usr/local/cargo/git/checkouts -name 'mod.rs' -path '*/report_aggregator/*' 2>/dev/null); do
+    if grep -q 'ReportHeader' "$APOLLO_SRC" 2>/dev/null; then
+        if ! grep -q 'agent_id' "$APOLLO_SRC" 2>/dev/null; then
+            echo "Patching $APOLLO_SRC to add agent_id field..."
+            sed -i 's/let reported_header = ReportHeader {{/let reported_header = ReportHeader {{ agent_id: String::new(),/' "$APOLLO_SRC"
+        fi
+    fi
+done
+
+# Clean build cache so patched source gets recompiled
+cargo clean -p async-graphql-extension-apollo-tracing 2>&1 || true
+
+# Second attempt — should compile with the patch
+cargo test 2>&1 || true
 
 """.format(pr=self.pr),
             ),
@@ -133,8 +161,16 @@ cargo test --locked || true
 set -e
 
 cd /home/{pr.repo}
-export DOCS_RS=1
-cargo test --locked
+
+# Re-apply apollo-tracing patch if needed (git checkout may have reset cargo cache)
+for APOLLO_SRC in $(find /usr/local/cargo/registry/src /usr/local/cargo/git/checkouts -name 'mod.rs' -path '*/report_aggregator/*' 2>/dev/null); do
+    if grep -q 'ReportHeader' "$APOLLO_SRC" 2>/dev/null && ! grep -q 'agent_id' "$APOLLO_SRC" 2>/dev/null; then
+        sed -i 's/let reported_header = ReportHeader {{/let reported_header = ReportHeader {{ agent_id: String::new(),/' "$APOLLO_SRC"
+        cargo clean -p async-graphql-extension-apollo-tracing 2>&1 || true
+    fi
+done
+
+cargo test
 
 """.format(pr=self.pr),
             ),
@@ -145,8 +181,15 @@ cargo test --locked
 set -e
 
 cd /home/{pr.repo}
-export DOCS_RS=1
 git apply /home/test.patch
+
+for APOLLO_SRC in $(find /usr/local/cargo/registry/src /usr/local/cargo/git/checkouts -name 'mod.rs' -path '*/report_aggregator/*' 2>/dev/null); do
+    if grep -q 'ReportHeader' "$APOLLO_SRC" 2>/dev/null && ! grep -q 'agent_id' "$APOLLO_SRC" 2>/dev/null; then
+        sed -i 's/let reported_header = ReportHeader {{/let reported_header = ReportHeader {{ agent_id: String::new(),/' "$APOLLO_SRC"
+        cargo clean -p async-graphql-extension-apollo-tracing 2>&1 || true
+    fi
+done
+
 cargo test
 
 """.format(pr=self.pr),
@@ -158,8 +201,15 @@ cargo test
 set -e
 
 cd /home/{pr.repo}
-export DOCS_RS=1
 git apply /home/test.patch /home/fix.patch
+
+for APOLLO_SRC in $(find /usr/local/cargo/registry/src /usr/local/cargo/git/checkouts -name 'mod.rs' -path '*/report_aggregator/*' 2>/dev/null); do
+    if grep -q 'ReportHeader' "$APOLLO_SRC" 2>/dev/null && ! grep -q 'agent_id' "$APOLLO_SRC" 2>/dev/null; then
+        sed -i 's/let reported_header = ReportHeader {{/let reported_header = ReportHeader {{ agent_id: String::new(),/' "$APOLLO_SRC"
+        cargo clean -p async-graphql-extension-apollo-tracing 2>&1 || true
+    fi
+done
+
 cargo test
 
 """.format(pr=self.pr),
@@ -227,9 +277,9 @@ class Tailcall(Instance):
         failed_tests = set()
         skipped_tests = set()
 
-        re_pass_tests = [re.compile(r"test (\S+) ... ok")]
-        re_fail_tests = [re.compile(r"test (\S+) ... FAILED")]
-        re_skip_tests = [re.compile(r"test (\S+) ... ignored")]
+        re_pass_tests = [re.compile(r"test (\S+)\s+\.\.\. ok")]
+        re_fail_tests = [re.compile(r"test (\S+)\s+\.\.\. FAILED")]
+        re_skip_tests = [re.compile(r"test (\S+)\s+\.\.\. ignored")]
 
         for line in test_log.splitlines():
             line = line.strip()
