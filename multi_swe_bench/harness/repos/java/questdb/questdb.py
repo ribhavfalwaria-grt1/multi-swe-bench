@@ -1,6 +1,6 @@
 import re
 import textwrap
-from typing import Optional, Union
+from typing import Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -46,11 +46,8 @@ class QuestdbImageBase(Image):
 
 {self.global_env}
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
 WORKDIR /home/
-RUN apt-get update && apt-get install -y git openjdk-11-jdk maven
+RUN apt-get update && apt-get install -y git
 
 {code}
 
@@ -72,8 +69,11 @@ class QuestdbImageDefault(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> Image | None:
+    def dependency(self) -> Image:
         return QuestdbImageBase(self.pr, self._config)
+
+    def image_prefix(self) -> str:
+        return "mswebench"
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -120,41 +120,29 @@ exit 0
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git reset --hard
 bash /home/check_git_changes.sh
-git checkout {pr.base.sha}
+git checkout {base_sha}
 bash /home/check_git_changes.sh
-if [ ! -f ~/.m2/settings.xml ]; then
-    mkdir -p ~/.m2 && cat <<EOF > ~/.m2/settings.xml
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
 
-    <mirrors>
-        <mirror>
-            <id>aliyunmaven</id>
-            <mirrorOf>central</mirrorOf>
-            <name>Aliyun Maven Mirror</name>
-            <url>https://maven.aliyun.com/repository/public</url>
-        </mirror>
-    </mirrors>
-
-</settings>
-EOF
-else
-  grep -q "<mirror>" ~/.m2/settings.xml || sed -i '/<\\/settings>/i \\
-  <mirrors> \\
-      <mirror> \\
-          <id>aliyunmaven</id> \\
-          <mirrorOf>central</mirrorOf> \\
-          <name>Aliyun Maven Mirror</name> \\
-          <url>https://maven.aliyun.com/repository/public</url> \\
-      </mirror> \\
-  </mirrors>' ~/.m2/settings.xml
+# Detect required Java version from pom.xml, default to 11
+JAVA_VERSION=11
+if [ -f pom.xml ]; then
+    for prop in maven.compiler.source java.version release; do
+        ver=$(sed -n "s/.*<$prop>\\([^<]*\\)<.*/\\1/p" pom.xml | head -1)
+        if [ -n "$ver" ]; then
+            case "$ver" in 1.*) ver=${{ver#1.}} ;; esac
+            JAVA_VERSION=$ver
+            break
+        fi
+    done
 fi
+
+apt-get update && apt-get install -y openjdk-${{JAVA_VERSION}}-jdk maven && rm -rf /var/lib/apt/lists/*
+
 mvn clean test -pl core -fae -Dstyle.color=never || true
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, base_sha=self.pr.base.sha),
             ),
             File(
                 ".",
@@ -162,9 +150,9 @@ mvn clean test -pl core -fae -Dstyle.color=never || true
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 mvn clean test -pl core -fae -Dstyle.color=never
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo),
             ),
             File(
                 ".",
@@ -172,11 +160,13 @@ mvn clean test -pl core -fae -Dstyle.color=never
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch
+cd /home/{repo}
+if ! git -C /home/{repo} apply --whitespace=nowarn /home/test.patch; then
+    echo "Error: git apply failed" >&2
+    exit 1
+fi
 mvn clean test -pl core -fae -Dstyle.color=never
-
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo),
             ),
             File(
                 ".",
@@ -184,11 +174,13 @@ mvn clean test -pl core -fae -Dstyle.color=never
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch /home/fix.patch
+cd /home/{repo}
+if ! git -C /home/{repo} apply --whitespace=nowarn /home/test.patch /home/fix.patch; then
+    echo "Error: git apply failed" >&2
+    exit 1
+fi
 mvn clean test -pl core -fae -Dstyle.color=never
-
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo),
             ),
         ]
 
@@ -202,11 +194,30 @@ mvn clean test -pl core -fae -Dstyle.color=never
             copy_commands += f"COPY {file.name} /home/\n"
 
         prepare_commands = "RUN bash /home/prepare.sh"
+
+        mirror_setup = textwrap.dedent(
+            """
+                RUN mkdir -p ~/.m2 && \\
+                    echo '<?xml version="1.0" encoding="UTF-8"?>' > ~/.m2/settings.xml && \\
+                    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> ~/.m2/settings.xml && \\
+                    echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' >> ~/.m2/settings.xml && \\
+                    echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">' >> ~/.m2/settings.xml && \\
+                    echo '    <mirrors>' >> ~/.m2/settings.xml && \\
+                    echo '        <mirror>' >> ~/.m2/settings.xml && \\
+                    echo '            <id>aliyunmaven</id>' >> ~/.m2/settings.xml && \\
+                    echo '            <mirrorOf>central</mirrorOf>' >> ~/.m2/settings.xml && \\
+                    echo '            <name>Aliyun Maven Mirror</name>' >> ~/.m2/settings.xml && \\
+                    echo '            <url>https://maven.aliyun.com/repository/public</url>' >> ~/.m2/settings.xml && \\
+                    echo '        </mirror>' >> ~/.m2/settings.xml && \\
+                    echo '    </mirrors>' >> ~/.m2/settings.xml && \\
+                    echo '</settings>' >> ~/.m2/settings.xml
+            """
+        )
+
         proxy_setup = ""
         proxy_cleanup = ""
 
         if self.global_env:
-            # Extract proxy host and port
             proxy_host = None
             proxy_port = None
 
@@ -218,18 +229,11 @@ mvn clean test -pl core -fae -Dstyle.color=never
                     proxy_host = match.group(2)
                     proxy_port = match.group(3)
                     break
+
             if proxy_host and proxy_port:
                 proxy_setup = textwrap.dedent(
                     f"""
-                RUN mkdir -p ~/.m2 && \\
-                    if [ ! -f ~/.m2/settings.xml ]; then \\
-                        echo '<?xml version="1.0" encoding="UTF-8"?>' > ~/.m2/settings.xml && \\
-                        echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> ~/.m2/settings.xml && \\
-                        echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' >> ~/.m2/settings.xml && \\
-                        echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">' >> ~/.m2/settings.xml && \\
-                        echo '</settings>' >> ~/.m2/settings.xml; \\
-                    fi && \\
-                    sed -i '$d' ~/.m2/settings.xml && \\
+                RUN sed -i '$d' ~/.m2/settings.xml && \\
                     echo '<proxies>' >> ~/.m2/settings.xml && \\
                     echo '    <proxy>' >> ~/.m2/settings.xml && \\
                     echo '        <id>example-proxy</id>' >> ~/.m2/settings.xml && \\
@@ -251,9 +255,12 @@ mvn clean test -pl core -fae -Dstyle.color=never
                     RUN sed -i '/<proxies>/,/<\\/proxies>/d' ~/.m2/settings.xml
                 """
                 )
+
         return f"""FROM {name}:{tag}
 
 {self.global_env}
+
+{mirror_setup}
 
 {proxy_setup}
 
@@ -279,25 +286,22 @@ class Questdb(Instance):
     def pr(self) -> PullRequest:
         return self._pr
 
-    def dependency(self) -> Optional[Image]:
+    def dependency(self) -> Image:
         return QuestdbImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
-
         return "bash /home/run.sh"
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
         if test_patch_run_cmd:
             return test_patch_run_cmd
-
         return "bash /home/test-run.sh"
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
         if fix_patch_run_cmd:
             return fix_patch_run_cmd
-
         return "bash /home/fix-run.sh"
 
     def parse_log(self, test_log: str) -> TestResult:
