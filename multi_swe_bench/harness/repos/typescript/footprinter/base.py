@@ -26,10 +26,10 @@ class ImageDefault(Image):
         return "envagent"
 
     def image_tag(self) -> str:
-        return f"pr-{{self.pr.number}}"
+        return f"pr-{self.pr.number}"
 
     def workdir(self) -> str:
-        return f"pr-{{self.pr.number}}"
+        return f"pr-{self.pr.number}"
 
     def files(self) -> list[File]:
         repo_name = self.pr.repo
@@ -37,12 +37,12 @@ class ImageDefault(Image):
             File(
                 ".",
                 "fix.patch",
-                f"{{self.pr.fix_patch}}",
+                f"{self.pr.fix_patch}",
             ),
             File(
                 ".",
                 "test.patch",
-                f"{{self.pr.test_patch}}",
+                f"{self.pr.test_patch}",
             ),
             File(
                 ".",
@@ -60,7 +60,8 @@ bash test_commands.sh""",
                 "run.sh",
                 """#!/bin/bash
 cd /home/[[REPO_NAME]]
-yarn test || npm test || pnpm test
+bun install
+bun test
 """.replace("[[REPO_NAME]]", repo_name),
             ),
             File(
@@ -72,7 +73,8 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-yarn test || npm test || pnpm test
+bun install
+bun test
 """.replace("[[REPO_NAME]]", repo_name),
             ),
             File(
@@ -84,7 +86,8 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn  /home/test.patch /hom
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-yarn test || npm test || pnpm test
+bun install
+bun test
 """.replace("[[REPO_NAME]]", repo_name),
             ),
         ]
@@ -104,10 +107,14 @@ FROM node:20
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install basic requirements
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git curl
 
 # Ensure bash is available
 RUN if [ ! -f /bin/bash ]; then         if command -v apk >/dev/null 2>&1; then             apk add --no-cache bash;         elif command -v apt-get >/dev/null 2>&1; then             apt-get update && apt-get install -y bash;         elif command -v yum >/dev/null 2>&1; then             yum install -y bash;         else             exit 1;         fi     fi
+
+# Install bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:$PATH"
 
 WORKDIR /home/
 COPY fix.patch /home/
@@ -116,7 +123,7 @@ RUN git clone https://github.com/tscircuit/footprinter.git /home/footprinter
 
 WORKDIR /home/footprinter
 RUN git reset --hard
-RUN git checkout {{pr_sha}}
+RUN git checkout {pr_sha}
 """
         dockerfile_content += """
 """ + copy_commands
@@ -159,9 +166,9 @@ class TscircuitFootprinterInstance(Instance):
         failed_tests = set()
         skipped_tests = set()
 
-        passed_match = re.search(r"Tests:\s+(\d+) passed", log)
-        failed_match = re.search(r"Tests:\s+(\d+) failed", log)
-        skipped_match = re.search(r"Tests:\s+(\d+) skipped", log)
+        passed_match = re.search(r"(\d+)\s+pass", log)
+        failed_match = re.search(r"(\d+)\s+fail", log)
+        skipped_match = re.search(r"(\d+)\s+skip", log)
 
         passed_count = int(passed_match.group(1)) if passed_match else 0
         failed_count = int(failed_match.group(1)) if failed_match else 0
