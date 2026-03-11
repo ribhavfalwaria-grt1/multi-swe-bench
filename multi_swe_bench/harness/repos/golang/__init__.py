@@ -17,3 +17,8 @@ from multi_swe_bench.harness.repos.golang.syncthing import *
 from multi_swe_bench.harness.repos.golang.zeromicro import *
 from multi_swe_bench.harness.repos.golang.concourse import *
 from multi_swe_bench.harness.repos.golang.natsio import *
+from multi_swe_bench.harness.repos.golang.prequel_dev import *
+from multi_swe_bench.harness.repos.golang.terrastruct import *
+from multi_swe_bench.harness.repos.golang.go_gitea import *
+from multi_swe_bench.harness.repos.golang.projectdiscovery import *
+from multi_swe_bench.harness.repos.golang.weaviate_proj import *
