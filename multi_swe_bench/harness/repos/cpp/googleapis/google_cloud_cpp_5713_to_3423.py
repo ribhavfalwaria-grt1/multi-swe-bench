@@ -6,7 +6,7 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class Era1ImageBase(Image):
+class Era2ImageBase(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -50,6 +50,10 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN sed -i -e 's|archive.ubuntu.com|old-releases.ubuntu.com|g' \
+       -e 's|security.ubuntu.com|old-releases.ubuntu.com|g' \
+       /etc/apt/sources.list
+
 RUN apt-get update && apt-get install -y \\
     build-essential cmake git ninja-build \\
     patch pkg-config tar wget curl zip unzip \\
@@ -61,6 +65,13 @@ RUN apt-get update && apt-get install -y \\
 RUN cd /usr/src/googletest && cmake . -GNinja && ninja && ninja install && ldconfig
 
 WORKDIR /var/tmp/build
+RUN curl -sSL https://github.com/nlohmann/json/releases/download/v3.9.0/include.zip -o include.zip && \\
+    unzip -q include.zip -d nlohmann && \\
+    mkdir -p /usr/local/include && \\
+    cp -r nlohmann/include/nlohmann /usr/local/include/ && \\
+    cd /var/tmp && rm -fr build
+
+WORKDIR /var/tmp/build
 RUN curl -sSL https://github.com/google/crc32c/archive/1.0.6.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
@@ -70,7 +81,7 @@ RUN curl -sSL https://github.com/google/crc32c/archive/1.0.6.tar.gz | \\
     ldconfig && cd /var/tmp && rm -fr build
 
 WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/protocolbuffers/protobuf/archive/v3.9.1.tar.gz | \\
+RUN curl -sSL https://github.com/protocolbuffers/protobuf/archive/v3.12.4.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
       -Dprotobuf_BUILD_TESTS=OFF \\
@@ -79,7 +90,7 @@ RUN curl -sSL https://github.com/protocolbuffers/protobuf/archive/v3.9.1.tar.gz 
     ldconfig && cd /var/tmp && rm -fr build
 
 WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/grpc/grpc/archive/v1.24.3.tar.gz | \\
+RUN curl -sSL https://github.com/grpc/grpc/archive/v1.29.1.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \\
       -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF \\
@@ -91,23 +102,7 @@ RUN curl -sSL https://github.com/grpc/grpc/archive/v1.24.3.tar.gz | \\
     cmake --build cmake-out --target install && \\
     ldconfig && cd /var/tmp && rm -fr build
 
-WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/googleapis/cpp-cmakefiles/archive/v0.1.5.tar.gz | \\
-    tar -xzf - --strip-components=1 && \\
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
-      -GNinja -S . -B cmake-out && \\
-    cmake --build cmake-out --target install && \\
-    ldconfig && cd /var/tmp && rm -fr build
 
-WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/googleapis/google-cloud-cpp-common/archive/v0.16.0.tar.gz | \\
-    tar -xzf - --strip-components=1 && \\
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
-      -DBUILD_TESTING=OFF \\
-      -DGOOGLE_CLOUD_CPP_TESTING_UTIL_ENABLE_INSTALL=ON \\
-      -GNinja -S . -B cmake-out && \\
-    cmake --build cmake-out --target install && \\
-    ldconfig && cd /var/tmp && rm -fr build
 
 RUN ldconfig /usr/local/lib*
 
@@ -120,7 +115,7 @@ WORKDIR /home/
 """
 
 
-class Era1ImageDefault(Image):
+class Era2ImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -134,7 +129,7 @@ class Era1ImageDefault(Image):
         return self._config
 
     def dependency(self) -> Image:
-        return Era1ImageBase(self.pr, self._config)
+        return Era2ImageBase(self.pr, self._config)
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -264,8 +259,8 @@ ctest --output-on-failure
 """
 
 
-@Instance.register("googleapis", "google-cloud-cpp_4801_to_3303")
-class GoogleCloudCpp4801To3303(Instance):
+@Instance.register("googleapis", "google-cloud-cpp_5713_to_3423")
+class GoogleCloudCpp5713To3423(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -276,7 +271,7 @@ class GoogleCloudCpp4801To3303(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return Era1ImageDefault(self.pr, self._config)
+        return Era2ImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:

@@ -6,7 +6,7 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class Fc33EarlyImageBase(Image):
+class Fc33LateV2ImageBase(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -57,18 +57,56 @@ RUN dnf makecache && dnf groupinstall -y "Development Tools" && dnf install -y \
     cmake ninja-build git \\
     tar wget curl zip unzip \\
     libcurl-devel openssl-devel zlib-devel \\
-    protobuf-devel protobuf-compiler grpc-devel grpc-plugins \\
-    abseil-cpp-devel gtest-devel gmock-devel json-devel \\
+    gtest-devel gmock-devel \\
     c-ares-devel re2-devel \\
     && dnf clean all
 
 WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/google/crc32c/archive/1.0.6.tar.gz | \\
+RUN curl -sSL https://github.com/nlohmann/json/releases/download/v3.9.0/include.zip -o include.zip && \\
+    unzip -q include.zip -d nlohmann && \\
+    mkdir -p /usr/local/include && \\
+    cp -r nlohmann/include/nlohmann /usr/local/include/ && \\
+    cd /var/tmp && rm -fr build
+
+WORKDIR /var/tmp/build
+RUN curl -sSL https://github.com/abseil/abseil-cpp/archive/20200923.3.tar.gz | \\
+    tar -xzf - --strip-components=1 && \\
+    sed -i 's/^#define ABSL_OPTION_USE_\\(.*\\) 2/#define ABSL_OPTION_USE_\\1 0/' "absl/base/options.h" && \\
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
+      -DBUILD_TESTING=OFF -DABSL_BUILD_TESTING=OFF \\
+      -GNinja -S . -B cmake-out && \\
+    cmake --build cmake-out --target install && \\
+    ldconfig && cd /var/tmp && rm -fr build
+
+WORKDIR /var/tmp/build
+RUN curl -sSL https://github.com/google/crc32c/archive/1.1.1.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
       -DCRC32C_BUILD_TESTS=OFF -DCRC32C_BUILD_BENCHMARKS=OFF -DCRC32C_USE_GLOG=OFF \\
       -GNinja -S . -B cmake-out && \\
     cmake --build cmake-out --target install && \\
+    ldconfig && cd /var/tmp && rm -fr build
+
+
+WORKDIR /var/tmp/build
+RUN curl -sSL https://github.com/protocolbuffers/protobuf/archive/v3.17.1.tar.gz | \
+    tar -xzf - --strip-components=1 && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \
+      -Dprotobuf_BUILD_TESTS=OFF \
+      -GNinja -S cmake -B cmake-out && \
+    cmake --build cmake-out --target install && \
+    ldconfig && cd /var/tmp && rm -fr build
+
+WORKDIR /var/tmp/build
+RUN curl -sSL https://github.com/grpc/grpc/archive/v1.37.1.tar.gz | \
+    tar -xzf - --strip-components=1 && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+      -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF \
+      -DgRPC_ABSL_PROVIDER=package -DgRPC_CARES_PROVIDER=package \
+      -DgRPC_PROTOBUF_PROVIDER=package -DgRPC_RE2_PROVIDER=package \
+      -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package \
+      -GNinja -S . -B cmake-out && \
+    cmake --build cmake-out --target install && \
     ldconfig && cd /var/tmp && rm -fr build
 
 RUN ldconfig /usr/local/lib*
@@ -82,7 +120,7 @@ WORKDIR /home/
 """
 
 
-class Fc33EarlyImageDefault(Image):
+class Fc33LateV2ImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -96,7 +134,7 @@ class Fc33EarlyImageDefault(Image):
         return self._config
 
     def dependency(self) -> Image:
-        return Fc33EarlyImageBase(self.pr, self._config)
+        return Fc33LateV2ImageBase(self.pr, self._config)
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -106,16 +144,8 @@ class Fc33EarlyImageDefault(Image):
 
     def files(self) -> list[File]:
         return [
-            File(
-                ".",
-                "fix.patch",
-                f"{self.pr.fix_patch}",
-            ),
-            File(
-                ".",
-                "test.patch",
-                f"{self.pr.test_patch}",
-            ),
+            File(".", "fix.patch", f"{self.pr.fix_patch}"),
+            File(".", "test.patch", f"{self.pr.test_patch}"),
             File(
                 ".",
                 "check_git_changes.sh",
@@ -152,7 +182,7 @@ bash /home/check_git_changes.sh
 mkdir -p build && cd build
 cmake -S /home/{pr.repo} -B /home/{pr.repo}/build \\
     -DBUILD_TESTING=ON \\
-    -DGOOGLE_CLOUD_CPP_ENABLE=storage,bigtable,spanner,pubsub,iam,logging \\
+    -DGOOGLE_CLOUD_CPP_ENABLE=storage,bigtable,bigquery,spanner,pubsub,iam,logging \\
     -DGOOGLE_CLOUD_CPP_ENABLE_EXAMPLES=OFF \\
     -DCMAKE_BUILD_TYPE=Debug \\
     -GNinja
@@ -225,8 +255,8 @@ ctest --output-on-failure
 """
 
 
-@Instance.register("googleapis", "google-cloud-cpp_5608_to_5603")
-class GoogleCloudCpp5608To5603(Instance):
+@Instance.register("googleapis", "google-cloud-cpp_6659_to_6561")
+class GoogleCloudCpp6659To6561(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -237,24 +267,21 @@ class GoogleCloudCpp5608To5603(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return Fc33EarlyImageDefault(self.pr, self._config)
+        return Fc33LateV2ImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
-
         return "bash /home/run.sh"
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
         if test_patch_run_cmd:
             return test_patch_run_cmd
-
         return "bash /home/test-run.sh"
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
         if fix_patch_run_cmd:
             return fix_patch_run_cmd
-
         return "bash /home/fix-run.sh"
 
     def parse_log(self, test_log: str) -> TestResult:
@@ -277,24 +304,18 @@ class GoogleCloudCpp5608To5603(Instance):
             line = line.strip()
             if not line:
                 continue
-
             for re_pass in re_pass_tests:
                 pass_match = re_pass.match(line)
                 if pass_match:
-                    test = pass_match.group(1)
-                    passed_tests.add(test)
-
+                    passed_tests.add(pass_match.group(1))
             for re_fail in re_fail_tests:
                 fail_match = re_fail.match(line)
                 if fail_match:
-                    test = fail_match.group(1)
-                    failed_tests.add(test)
-
+                    failed_tests.add(fail_match.group(1))
             for re_skip in re_skip_tests:
                 skip_match = re_skip.match(line)
                 if skip_match:
-                    test = skip_match.group(1)
-                    skipped_tests.add(test)
+                    skipped_tests.add(skip_match.group(1))
 
         return TestResult(
             passed_count=len(passed_tests),

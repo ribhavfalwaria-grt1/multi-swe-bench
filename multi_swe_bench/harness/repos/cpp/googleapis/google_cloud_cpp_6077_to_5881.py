@@ -6,7 +6,7 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class Fc40ImageBase(Image):
+class Fc33MidImageBase(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -20,7 +20,7 @@ class Fc40ImageBase(Image):
         return self._config
 
     def dependency(self) -> Union[str, "Image"]:
-        return "fedora:40"
+        return "fedora:33"
 
     def image_tag(self) -> str:
         return "base"
@@ -49,43 +49,64 @@ WORKDIR /home/
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
+RUN sed -i -e 's|^metalink=|#metalink=|g' \
+       -e 's|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://archives.fedoraproject.org/pub/archive/fedora/linux|g' \
+       /etc/yum.repos.d/fedora*.repo
+
 RUN dnf makecache && dnf groupinstall -y "Development Tools" && dnf install -y \\
     cmake ninja-build git \\
     tar wget curl zip unzip \\
     libcurl-devel openssl-devel zlib-devel \\
-    gtest-devel gmock-devel json-devel \\
-    google-crc32c-devel \\
+    gtest-devel gmock-devel \\
     c-ares-devel re2-devel \\
     && dnf clean all
 
 WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/abseil/abseil-cpp/archive/20250127.1.tar.gz | \\
+RUN curl -sSL https://github.com/nlohmann/json/releases/download/v3.9.0/include.zip -o include.zip && \\
+    unzip -q include.zip -d nlohmann && \\
+    mkdir -p /usr/local/include && \\
+    cp -r nlohmann/include/nlohmann /usr/local/include/ && \\
+    cd /var/tmp && rm -fr build
+
+WORKDIR /var/tmp/build
+RUN curl -sSL https://github.com/abseil/abseil-cpp/archive/20200923.3.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     sed -i 's/^#define ABSL_OPTION_USE_\\(.*\\) 2/#define ABSL_OPTION_USE_\\1 0/' "absl/base/options.h" && \\
-    cmake -DCMAKE_BUILD_TYPE=Release -DABSL_BUILD_TESTING=OFF -DBUILD_SHARED_LIBS=yes \\
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
+      -DBUILD_TESTING=OFF -DABSL_BUILD_TESTING=OFF \\
       -GNinja -S . -B cmake-out && \\
     cmake --build cmake-out --target install && \\
     ldconfig && cd /var/tmp && rm -fr build
 
 WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/protocolbuffers/protobuf/archive/v29.4.tar.gz | \\
+RUN curl -sSL https://github.com/google/crc32c/archive/1.0.6.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
-      -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_ABSL_PROVIDER=package \\
+      -DCRC32C_BUILD_TESTS=OFF -DCRC32C_BUILD_BENCHMARKS=OFF -DCRC32C_USE_GLOG=OFF \\
       -GNinja -S . -B cmake-out && \\
     cmake --build cmake-out --target install && \\
     ldconfig && cd /var/tmp && rm -fr build
 
+
 WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/grpc/grpc/archive/v1.69.0.tar.gz | \\
-    tar -xzf - --strip-components=1 && \\
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \\
-      -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF \\
-      -DgRPC_ABSL_PROVIDER=package -DgRPC_CARES_PROVIDER=package \\
-      -DgRPC_PROTOBUF_PROVIDER=package -DgRPC_RE2_PROVIDER=package \\
-      -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package \\
-      -GNinja -S . -B cmake-out && \\
-    cmake --build cmake-out --target install && \\
+RUN curl -sSL https://github.com/protocolbuffers/protobuf/archive/v3.14.0.tar.gz | \
+    tar -xzf - --strip-components=1 && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \
+      -Dprotobuf_BUILD_TESTS=OFF \
+      -GNinja -S cmake -B cmake-out && \
+    cmake --build cmake-out --target install && \
+    ldconfig && cd /var/tmp && rm -fr build
+
+WORKDIR /var/tmp/build
+RUN curl -sSL https://github.com/grpc/grpc/archive/v1.35.0.tar.gz | \
+    tar -xzf - --strip-components=1 && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+      -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF \
+      -DgRPC_ABSL_PROVIDER=package -DgRPC_CARES_PROVIDER=package \
+      -DgRPC_PROTOBUF_PROVIDER=package -DgRPC_RE2_PROVIDER=package \
+      -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package \
+      -GNinja -S . -B cmake-out && \
+    cmake --build cmake-out --target install && \
     ldconfig && cd /var/tmp && rm -fr build
 
 RUN ldconfig /usr/local/lib*
@@ -99,7 +120,7 @@ WORKDIR /home/
 """
 
 
-class Fc40ImageDefault(Image):
+class Fc33MidImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -113,7 +134,7 @@ class Fc40ImageDefault(Image):
         return self._config
 
     def dependency(self) -> Image:
-        return Fc40ImageBase(self.pr, self._config)
+        return Fc33MidImageBase(self.pr, self._config)
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -161,7 +182,7 @@ bash /home/check_git_changes.sh
 mkdir -p build && cd build
 cmake -S /home/{pr.repo} -B /home/{pr.repo}/build \\
     -DBUILD_TESTING=ON \\
-    -DGOOGLE_CLOUD_CPP_ENABLE=storage,bigtable,spanner,pubsub,bigquery,iam,logging,kms,secretmanager,compute \\
+    -DGOOGLE_CLOUD_CPP_ENABLE=storage,bigtable,spanner,pubsub,iam,logging \\
     -DGOOGLE_CLOUD_CPP_ENABLE_EXAMPLES=OFF \\
     -DCMAKE_BUILD_TYPE=Debug \\
     -GNinja
@@ -234,8 +255,8 @@ ctest --output-on-failure
 """
 
 
-@Instance.register("googleapis", "google-cloud-cpp_15057_to_14350")
-class GoogleCloudCpp15057To14350(Instance):
+@Instance.register("googleapis", "google-cloud-cpp_6077_to_5881")
+class GoogleCloudCpp6077To5881(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -246,7 +267,7 @@ class GoogleCloudCpp15057To14350(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return Fc40ImageDefault(self.pr, self._config)
+        return Fc33MidImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:

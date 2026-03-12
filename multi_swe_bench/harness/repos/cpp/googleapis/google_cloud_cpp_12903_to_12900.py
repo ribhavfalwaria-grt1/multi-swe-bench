@@ -49,6 +49,10 @@ WORKDIR /home/
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
+RUN sed -i -e 's|^metalink=|#metalink=|g' \
+       -e 's|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://archives.fedoraproject.org/pub/archive/fedora/linux|g' \
+       /etc/yum.repos.d/fedora*.repo
+
 RUN dnf makecache && dnf groupinstall -y "Development Tools" && dnf install -y \\
     cmake ninja-build git \\
     tar wget curl zip unzip \\

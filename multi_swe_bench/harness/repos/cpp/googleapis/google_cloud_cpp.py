@@ -37,11 +37,16 @@ class GoogleCloudCppImageBase(Image):
             image_name = image_name.image_full_name()
 
         if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
+            code = f'RUN git clone "${{REPO_URL}}" /home/{self.pr.repo}'
         else:
             code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
 
-        return f"""FROM {image_name}
+        return f"""# syntax=docker/dockerfile:1.6
+FROM {image_name}
+
+ARG TARGETARCH
+ARG REPO_URL="https://github.com/{self.pr.org}/{self.pr.repo}.git"
+ARG BASE_COMMIT
 
 {self.global_env}
 
@@ -49,12 +54,16 @@ WORKDIR /home/
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-RUN dnf makecache && dnf groupinstall -y "Development Tools" && dnf install -y \\
-    cmake ninja-build git \\
+RUN sed -i -e 's|^metalink=|#metalink=|g' \
+       -e 's|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://archives.fedoraproject.org/pub/archive/fedora/linux|g' \
+       /etc/yum.repos.d/fedora*.repo
+
+RUN dnf makecache --setopt=retries=10 --setopt=timeout=60 && dnf groupinstall -y "Development Tools" && dnf install -y \\
+    cmake ninja-build git gcc-c++ \\
     tar wget curl zip unzip \\
     libcurl-devel openssl-devel zlib-devel \\
     gtest-devel gmock-devel json-devel \\
-    google-crc32c-devel \\
+    google-crc32c-devel google-benchmark-devel \\
     c-ares-devel re2-devel \\
     && dnf clean all
 
@@ -94,8 +103,14 @@ WORKDIR /home/
 
 {code}
 
+WORKDIR /home/{self.pr.repo}
+
+RUN git reset --hard
+RUN git checkout ${{BASE_COMMIT}}
+
 {self.clear_env}
 
+CMD ["/bin/bash"]
 """
 
 
