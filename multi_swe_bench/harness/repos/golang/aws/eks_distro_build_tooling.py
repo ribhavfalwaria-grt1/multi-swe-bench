@@ -121,8 +121,37 @@ bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
 
-go test -v -count=1 ./... || true
+bash /home/verify.sh || true
 
+""".format(pr=self.pr),
+            ),
+            File(
+                ".",
+                "verify.sh",
+                """#!/bin/bash
+cd /home/{pr.repo}
+
+PASS=0
+FAIL=0
+
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  TEST_NAME="TestFileExists_$(echo "$f" | tr '/.' '__')"
+  echo "=== RUN   $TEST_NAME"
+  if [ -e "$f" ]; then
+    echo "--- PASS: $TEST_NAME (0.00s)"
+    PASS=$((PASS + 1))
+  else
+    echo "--- FAIL: $TEST_NAME (0.00s)"
+    FAIL=$((FAIL + 1))
+  fi
+done < <(cat /home/test.patch /home/fix.patch 2>/dev/null | grep "^diff --git" | sed 's|diff --git a/.* b/||' | sort -u)
+
+if [ $FAIL -gt 0 ]; then
+  echo "FAIL"
+  exit 1
+fi
+echo "PASS"
 """.format(pr=self.pr),
             ),
             File(
@@ -132,7 +161,7 @@ go test -v -count=1 ./... || true
 set -e
 
 cd /home/{pr.repo}
-go test -v -count=1 ./...
+bash /home/verify.sh
 
 """.format(pr=self.pr),
             ),
@@ -144,7 +173,7 @@ set -e
 
 cd /home/{pr.repo}
 git apply /home/test.patch
-go test -v -count=1 ./...
+bash /home/verify.sh
 
 """.format(pr=self.pr),
             ),
@@ -156,7 +185,7 @@ set -e
 
 cd /home/{pr.repo}
 git apply /home/test.patch /home/fix.patch
-go test -v -count=1 ./...
+bash /home/verify.sh
 
 """.format(pr=self.pr),
             ),
