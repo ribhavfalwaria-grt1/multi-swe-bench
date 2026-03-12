@@ -49,9 +49,9 @@ WORKDIR /home/
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-RUN dnf makecache && dnf install -y \\
-    cmake gcc-c++ git make ninja-build \\
-    patch pkg-config tar wget curl zip unzip findutils \\
+RUN dnf makecache && dnf groupinstall -y "Development Tools" && dnf install -y \\
+    cmake ninja-build git \\
+    tar wget curl zip unzip \\
     libcurl-devel openssl-devel zlib-devel \\
     gtest-devel gmock-devel json-devel \\
     google-crc32c-devel \\

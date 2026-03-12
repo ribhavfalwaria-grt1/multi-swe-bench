@@ -53,11 +53,11 @@ RUN sed -i -e 's|^metalink=|#metalink=|g' \
        -e 's|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://archives.fedoraproject.org/pub/archive/fedora/linux|g' \
        /etc/yum.repos.d/fedora*.repo
 
-RUN dnf makecache && dnf install -y \\
-    cmake gcc-c++ git make ninja-build \\
-    patch pkg-config tar wget curl zip unzip findutils \\
+RUN dnf makecache && dnf groupinstall -y "Development Tools" && dnf install -y \\
+    cmake ninja-build git \\
+    tar wget curl zip unzip \\
     libcurl-devel openssl-devel zlib-devel \\
-    gtest-devel gmock-devel \\
+    gtest-devel gmock-devel json-devel \\
     c-ares-devel re2-devel \\
     && dnf clean all
 
@@ -88,15 +88,6 @@ RUN curl -sSL https://github.com/grpc/grpc/archive/v1.44.0.tar.gz | \\
       -DgRPC_ABSL_PROVIDER=package -DgRPC_CARES_PROVIDER=package \\
       -DgRPC_PROTOBUF_PROVIDER=package -DgRPC_RE2_PROVIDER=package \\
       -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package \\
-      -GNinja -S . -B cmake-out && \\
-    cmake --build cmake-out --target install && \\
-    ldconfig && cd /var/tmp && rm -fr build
-
-WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/nlohmann/json/archive/v3.10.5.tar.gz | \\
-    tar -xzf - --strip-components=1 && \\
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
-      -DBUILD_TESTING=OFF -DJSON_BuildTests=OFF \\
       -GNinja -S . -B cmake-out && \\
     cmake --build cmake-out --target install && \\
     ldconfig && cd /var/tmp && rm -fr build

@@ -55,7 +55,10 @@ RUN apt-get update && apt-get install -y \\
     patch pkg-config tar wget curl zip unzip \\
     libcurl4-openssl-dev libssl-dev zlib1g-dev \\
     ca-certificates automake autoconf libtool \\
+    libc-ares-dev libgtest-dev google-mock \\
     && rm -rf /var/lib/apt/lists/*
+
+RUN cd /usr/src/googletest && cmake . -GNinja && ninja && ninja install && ldconfig
 
 WORKDIR /var/tmp/build
 RUN curl -sSL https://github.com/google/crc32c/archive/1.0.6.tar.gz | \\
@@ -76,16 +79,6 @@ RUN curl -sSL https://github.com/protocolbuffers/protobuf/archive/v3.9.1.tar.gz 
     ldconfig && cd /var/tmp && rm -fr build
 
 WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/c-ares/c-ares/archive/cares-1_14_0.tar.gz | \\
-    tar -xzf - --strip-components=1 && \\
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
-      -GNinja -S . -B cmake-out && \\
-    cmake --build cmake-out --target install && \\
-    ./buildconf && ./configure && \\
-    install -m 644 -D -t /usr/local/lib/pkgconfig libcares.pc && \\
-    ldconfig && cd /var/tmp && rm -fr build
-
-WORKDIR /var/tmp/build
 RUN curl -sSL https://github.com/grpc/grpc/archive/v1.24.3.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \\
@@ -100,14 +93,6 @@ RUN curl -sSL https://github.com/grpc/grpc/archive/v1.24.3.tar.gz | \\
 
 WORKDIR /var/tmp/build
 RUN curl -sSL https://github.com/googleapis/cpp-cmakefiles/archive/v0.1.5.tar.gz | \\
-    tar -xzf - --strip-components=1 && \\
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
-      -GNinja -S . -B cmake-out && \\
-    cmake --build cmake-out --target install && \\
-    ldconfig && cd /var/tmp && rm -fr build
-
-WORKDIR /var/tmp/build
-RUN curl -sSL https://github.com/google/googletest/archive/release-1.10.0.tar.gz | \\
     tar -xzf - --strip-components=1 && \\
     cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=yes \\
       -GNinja -S . -B cmake-out && \\
