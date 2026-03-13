@@ -37,3 +37,4 @@ from multi_swe_bench.harness.repos.golang.tigrisdata_archive import *
 from multi_swe_bench.harness.repos.golang.woodpecker_ci import *
 from multi_swe_bench.harness.repos.golang.permify import *
 from multi_swe_bench.harness.repos.golang.synapsecns import *
+from multi_swe_bench.harness.repos.golang.stakwork import *
