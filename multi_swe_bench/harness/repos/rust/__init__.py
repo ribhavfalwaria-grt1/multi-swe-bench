@@ -3,6 +3,7 @@ from multi_swe_bench.harness.repos.rust.bee_san import *
 from multi_swe_bench.harness.repos.rust.BurntSushi import *
 from multi_swe_bench.harness.repos.rust.clap_rs import *
 from multi_swe_bench.harness.repos.rust.fish_shell import *
+from multi_swe_bench.harness.repos.rust.golemcloud import *
 from multi_swe_bench.harness.repos.rust.helix_editor import *
 from multi_swe_bench.harness.repos.rust.nushell import *
 from multi_swe_bench.harness.repos.rust.rayon_rs import *
@@ -10,4 +11,5 @@ from multi_swe_bench.harness.repos.rust.rusqlite import *
 from multi_swe_bench.harness.repos.rust.rust_lang import *
 from multi_swe_bench.harness.repos.rust.serde_rs import *
 from multi_swe_bench.harness.repos.rust.sharkdp import *
+from multi_swe_bench.harness.repos.rust.tailcallhq import *
 from multi_swe_bench.harness.repos.rust.tokio_rs import *

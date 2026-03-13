@@ -48,6 +48,13 @@ def get_parser() -> argparse.ArgumentParser:
         default=False,
         help="Skip commit message.",
     )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["swe", "lht"],
+        default="swe",
+        help="Filter mode: swe (require resolved issues) or lht (all merged PRs).",
+    )
 
     return parser
 
@@ -94,11 +101,12 @@ def get_github(token) -> Github:
     return Github(auth=auth, per_page=100)
 
 
-def main(tokens: list[str], out_dir: Path, prs_file: Path, skip_commit_message: bool):
+def main(tokens: list[str], out_dir: Path, prs_file: Path, skip_commit_message: bool, mode: str = "swe"):
     print("starting filter to obtain required pull requests")
     print(f"Output directory: {out_dir}")
     print((f"All Pull Requests: {prs_file}"))
     print(f"Skip commit message: {skip_commit_message}")
+    print(f"Mode: {mode}")
 
     org_repo_re = re.compile(r"(.+)__(.+)_prs.jsonl")
     m = org_repo_re.match(prs_file.name)
@@ -115,9 +123,15 @@ def main(tokens: list[str], out_dir: Path, prs_file: Path, skip_commit_message: 
         g = get_github(random.choice(tokens))
         r = g.get_repo(f"{org}/{repo}")
 
+    # Determine output filename based on mode
+    if mode == "lht":
+        out_filename = f"{org}__{repo}_lht_filtered_prs.jsonl"
+    else:
+        out_filename = f"{org}__{repo}_filtered_prs.jsonl"
+
     with (
         open(
-            out_dir / f"{org}__{repo}_filtered_prs.jsonl",
+            out_dir / out_filename,
             "w",
             encoding="utf-8",
         ) as out_file,
@@ -127,6 +141,10 @@ def main(tokens: list[str], out_dir: Path, prs_file: Path, skip_commit_message: 
 
         for pull in tqdm(prs, desc="Pull Requests"):
             if pull["state"] != "closed":
+                continue
+
+            # Skip PRs that were never merged (for LHT we need merged PRs)
+            if mode == "lht" and not pull.get("merged_at"):
                 continue
 
             pull["commits"] = []
@@ -142,7 +160,10 @@ def main(tokens: list[str], out_dir: Path, prs_file: Path, skip_commit_message: 
                 ]
 
             resolved_issues = extract_resolved_issues(pull)
-            if len(resolved_issues) == 0:
+
+            # In SWE mode, require at least one resolved issue
+            # In LHT mode, accept all merged PRs regardless of issue references
+            if mode == "swe" and len(resolved_issues) == 0:
                 continue
 
             pull["resolved_issues"] = resolved_issues
@@ -155,4 +176,4 @@ if __name__ == "__main__":
 
     tokens = get_tokens(args.tokens)
 
-    main(tokens, Path.cwd() / args.out_dir, args.prs_file, args.skip_commit_message)
+    main(tokens, Path.cwd() / args.out_dir, args.prs_file, args.skip_commit_message, args.mode)

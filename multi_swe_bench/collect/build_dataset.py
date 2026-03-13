@@ -219,6 +219,23 @@ def main(
                     break
                 except Exception as e:
                     set_failed_number(log_file, pr["number"])
+                    # Permanent errors (e.g. 404 "no common ancestor") won't
+                    # resolve with retries — skip this PR and continue.
+                    error_msg = str(e)
+                    is_permanent = any(
+                        marker in error_msg
+                        for marker in [
+                            "404",
+                            "No common ancestor",
+                            "422",
+                            "Not Found",
+                        ]
+                    )
+                    if is_permanent:
+                        print(
+                            f"\nSkipping PR #{pr['number']}: permanent error — {error_msg}"
+                        )
+                        break
                     if delay_on_error is None or attempt == retry_attempts - 1:
                         raise e
                     else:

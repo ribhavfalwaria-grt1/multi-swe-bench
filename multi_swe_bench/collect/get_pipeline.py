@@ -18,6 +18,7 @@ from pathlib import Path
 from multi_swe_bench.collect.build_dataset import main as build_dataset
 from multi_swe_bench.collect.filter_prs import main as filter_prs
 from multi_swe_bench.collect.get_all_prs import main as get_all_prs
+from multi_swe_bench.collect.get_lht_pipeline import run_pipeline as run_lht_pipeline
 from multi_swe_bench.collect.get_related_issues import main as get_related_issues
 from multi_swe_bench.collect.merge_prs_with_issues import main as merge_prs_with_issues
 from multi_swe_bench.collect.util import get_tokens, optional_int
@@ -56,6 +57,37 @@ def get_parser() -> argparse.ArgumentParser:
         type=bool,
         default=False,
         help="Skip commit message.",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["swe", "lht"],
+        default="swe",
+        help="Pipeline mode: swe (single-PR tasks) or lht (long-horizon bundled tasks).",
+    )
+    parser.add_argument(
+        "--max-tags",
+        type=int,
+        default=200,
+        help="[LHT] Maximum number of tags to fetch (default: 200)."
+    )
+    parser.add_argument(
+        "--window-days",
+        type=int,
+        default=30,
+        help="[LHT] Fallback time-window size in days (default: 30).",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=str,
+        default=".repo_cache",
+        help="[LHT] Directory for cached bare git clones (default: .repo_cache).",
+    )
+    parser.add_argument(
+        "--lang",
+        type=str,
+        default="python",
+        help="[LHT] Programming language of the repository (default: python).",
     )
 
     return parser
@@ -98,12 +130,26 @@ if __name__ == "__main__":
     args = parser.parse_args()
     tokens = get_tokens(args.tokens)
 
-    run_pipeline(
-        out_dir=args.out_dir,
-        tokens=tokens,
-        org=args.org,
-        repo=args.repo,
-        delay_on_error=args.delay_on_error,
-        retry_attempts=args.retry_attempts,
-        skip_commit_message=args.skip_commit_message,
-    )
+    if args.mode == "lht":
+        run_lht_pipeline(
+            out_dir=args.out_dir,
+            tokens=tokens,
+            org=args.org,
+            repo=args.repo,
+            delay_on_error=args.delay_on_error,
+            retry_attempts=args.retry_attempts,
+            max_tags=args.max_tags,
+            window_days=args.window_days,
+            cache_dir=args.cache_dir,
+            lang=args.lang,
+        )
+    else:
+        run_pipeline(
+            out_dir=args.out_dir,
+            tokens=tokens,
+            org=args.org,
+            repo=args.repo,
+            delay_on_error=args.delay_on_error,
+            retry_attempts=args.retry_attempts,
+            skip_commit_message=args.skip_commit_message,
+        )

@@ -95,3 +95,23 @@ from multi_swe_bench.harness.repos.typescript.GMOD import *
 from multi_swe_bench.harness.repos.typescript.HoudiniGraphql import *
 from multi_swe_bench.harness.repos.typescript.NomicFoundation import *
 from multi_swe_bench.harness.repos.typescript.Effect_TS import *
+from multi_swe_bench.harness.repos.typescript.stakwork import *
+from multi_swe_bench.harness.repos.typescript.thenewboston_blockchain import *
+
+from multi_swe_bench.harness.repos.typescript.footprinter import *
+from multi_swe_bench.harness.repos.typescript.archestra import *
+from multi_swe_bench.harness.repos.typescript.cal_com import *
+from multi_swe_bench.harness.repos.typescript.remotion import *
+from multi_swe_bench.harness.repos.typescript.circuit_to_svg import *
+from multi_swe_bench.harness.repos.typescript.tscircuit_com import *
+from multi_swe_bench.harness.repos.typescript.cli import *
+from multi_swe_bench.harness.repos.typescript.eval import *
+from multi_swe_bench.harness.repos.typescript.footprinter import *
+from multi_swe_bench.harness.repos.typescript.archestra import *
+from multi_swe_bench.harness.repos.typescript.cal_com import *
+from multi_swe_bench.harness.repos.typescript.remotion import *
+from multi_swe_bench.harness.repos.typescript.circuit_to_svg import *
+from multi_swe_bench.harness.repos.typescript.tscircuit_com import *
+from multi_swe_bench.harness.repos.typescript.cli import *
+from multi_swe_bench.harness.repos.typescript.eval import *
+from multi_swe_bench.harness.repos.typescript.tscircuit import *
