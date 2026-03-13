@@ -20,7 +20,7 @@ class ImageDefault(Image):
         return self._config
 
     def dependency(self) -> str:
-        return "node:16"
+        return "node:18"
 
     def image_prefix(self) -> str:
         return "envagent"
@@ -55,7 +55,7 @@ node -v
 ###ACTION_DELIMITER###
 yarn install
 ###ACTION_DELIMITER###
-echo -e '#!/bin/bash\\nNODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest' > test_commands.sh
+echo -e '#!/bin/bash\\nNODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest --verbose' > test_commands.sh
 ###ACTION_DELIMITER###
 chmod +x test_commands.sh
 ###ACTION_DELIMITER###
@@ -70,7 +70,7 @@ bash test_commands.sh""",
                 "run.sh",
                 """#!/bin/bash
 cd /home/[[REPO_NAME]]
-NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest
+NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest --verbose
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -81,9 +81,9 @@ NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest
 cd /home/[[REPO_NAME]]
 if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest
+NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest --verbose
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -94,9 +94,9 @@ NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest
 cd /home/[[REPO_NAME]]
 if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest
+NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest --verbose
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -108,7 +108,7 @@ NODE_OPTIONS="--max_old_space_size=8192" yarn run test-jest
             copy_commands += f"COPY {file.name} /home/\n"
 
         dockerfile_content = """
-FROM node:16
+FROM node:18
 
 ## Set noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
@@ -127,6 +127,7 @@ RUN git clone https://github.com/stakwork/sphinx-tribes-frontend.git /home/sphin
 WORKDIR /home/sphinx-tribes-frontend
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+RUN yarn install
 """
         dockerfile_content += f"""
 {copy_commands}
@@ -134,8 +135,8 @@ RUN git checkout {pr.base.sha}
         return dockerfile_content.format(pr=self.pr)
 
 
-@Instance.register("stakwork", "sphinx_tribes_frontend")
-class SPHINX_TRIBES_FRONTEND(Instance):
+@Instance.register("stakwork", "sphinx-tribes-frontend")
+class SPHINX_TRIBES_FRONTEND_63_TO_36(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
