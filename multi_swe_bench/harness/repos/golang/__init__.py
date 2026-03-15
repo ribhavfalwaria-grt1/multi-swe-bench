@@ -39,4 +39,4 @@ from multi_swe_bench.harness.repos.golang.permify import *
 from multi_swe_bench.harness.repos.golang.synapsecns import *
 from multi_swe_bench.harness.repos.golang.stakwork import *
 from multi_swe_bench.harness.repos.golang.superplanehq.superplane import *
-
+from multi_swe_bench.harness.repos.golang.pactus_project import *
