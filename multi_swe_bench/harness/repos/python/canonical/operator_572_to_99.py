@@ -101,7 +101,7 @@ pytest -v --capture=fd
                 "test-run.sh",
                 """#!/bin/bash
 cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch; then
+if ! git -C /home/{pr.repo} apply --whitespace=nowarn --binary /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
@@ -114,7 +114,7 @@ pytest -v --capture=fd
                 "fix-run.sh",
                 """#!/bin/bash
 cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+if ! git -C /home/{pr.repo} apply --whitespace=nowarn --binary /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
@@ -157,6 +157,10 @@ RUN git clone https://github.com/canonical/operator.git /home/operator
 WORKDIR /home/operator
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+RUN apt-get install -y libyaml-dev && \
+    pip install -r requirements-dev.txt || true && \
+    pip install pytest pyyaml pydocstyle logassert
 """
         dockerfile_content += f"""
 {copy_commands}

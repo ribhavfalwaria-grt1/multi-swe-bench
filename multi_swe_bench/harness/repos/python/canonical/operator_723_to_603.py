@@ -77,7 +77,7 @@ tox -v
                 "test-run.sh",
                 """#!/bin/bash
 cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch; then
+if ! git -C /home/{pr.repo} apply --whitespace=nowarn --binary /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
@@ -90,7 +90,7 @@ tox -v
                 "fix-run.sh",
                 """#!/bin/bash
 cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+if ! git -C /home/{pr.repo} apply --whitespace=nowarn --binary /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
@@ -133,6 +133,10 @@ RUN git clone https://github.com/canonical/operator.git /home/operator
 WORKDIR /home/operator
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+RUN apt-get install -y python3-pip libyaml-dev && \
+    pip install --break-system-packages --force-reinstall --no-cache-dir pyyaml && \
+    pip install --break-system-packages tox
 """
         dockerfile_content += f"""
 {copy_commands}

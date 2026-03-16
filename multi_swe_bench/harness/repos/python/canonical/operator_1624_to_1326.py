@@ -62,7 +62,7 @@ cat test_commands.sh""",
                 "run.sh",
                 """#!/bin/bash
 cd /home/{pr.repo}
-pytest -n auto --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test/benchmark -v --tb native
+pytest --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test/benchmark -v --tb native
 
 """.format(pr=self.pr),
             ),
@@ -71,11 +71,11 @@ pytest -n auto --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test
                 "test-run.sh",
                 """#!/bin/bash
 cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn /home/test.patch; then
+if ! git -C /home/{pr.repo} apply --whitespace=nowarn --binary /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-pytest -n auto --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test/benchmark -v --tb native
+pytest --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test/benchmark -v --tb native
 
 """.format(pr=self.pr),
             ),
@@ -84,11 +84,11 @@ pytest -n auto --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test
                 "fix-run.sh",
                 """#!/bin/bash
 cd /home/{pr.repo}
-if ! git -C /home/{pr.repo} apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+if ! git -C /home/{pr.repo} apply --whitespace=nowarn --binary /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-pytest -n auto --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test/benchmark -v --tb native
+pytest --ignore=test/smoke --ignore=test/benchmark --ignore=testing/test/benchmark -v --tb native
 
 """.format(pr=self.pr),
             ),
@@ -127,6 +127,9 @@ RUN git clone https://github.com/canonical/operator.git /home/operator
 WORKDIR /home/operator
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+RUN pip install -e . && \
+    pip install -e ".[testing]" pytest pytest-xdist typing_extensions jsonpatch
 """
         dockerfile_content += f"""
 {copy_commands}
@@ -173,23 +176,27 @@ class OPERATOR_1624_TO_1326(Instance):
         skipped_tests = set[str]()  # Tests that were skipped
         import re
 
-        # Extract passed tests
+        # Extract passed tests (xdist format)
         passed_matches = re.findall(r"\[gw\d+\] \[\s*\d+%\] PASSED (.*)", log)
         passed_tests.update(passed_matches)
-        # Extract failed tests from FAILED lines
+        # Extract passed tests (plain pytest format)
+        passed_matches2 = re.findall(r"^(test\S+)\s+PASSED", log, re.MULTILINE)
+        passed_tests.update(passed_matches2)
+        # Extract failed tests from FAILED lines (xdist format)
         failed_matches = re.findall(r"\[gw\d+\] \[\s*\d+%\] FAILED (.*)", log)
         failed_tests.update(failed_matches)
+        # Extract failed tests (plain pytest format)
+        failed_matches2 = re.findall(r"FAILED (test\S+)", log)
+        failed_tests.update(failed_matches2)
         # Extract failed tests from ERROR lines
         error_matches = re.findall(r"\[\d+\]\s+ERROR\s+(.*?)(?:\s+-|$)", log)
         failed_tests.update(error_matches)
-        # Extract skipped tests
+        # Extract skipped tests (xdist format)
         skipped_matches = re.findall(r"\[gw\d+\] \[\s*\d+%\] SKIPPED (.*)", log)
         skipped_tests.update(skipped_matches)
-        parsed_results = {
-            "passed_tests": passed_tests,
-            "failed_tests": failed_tests,
-            "skipped_tests": skipped_tests,
-        }
+        # Extract skipped tests (plain pytest format)
+        skipped_matches2 = re.findall(r"^(test\S+)\s+SKIPPED", log, re.MULTILINE)
+        skipped_tests.update(skipped_matches2)
 
         return TestResult(
             passed_count=len(passed_tests),
