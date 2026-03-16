@@ -1,6 +1,5 @@
 import re
-import textwrap
-from typing import Optional, Union
+from typing import Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -42,131 +41,12 @@ class SpotbugsImageBase(Image):
         else:
             code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
 
-        copy_commands = ""
-        for file in self.files():
-            copy_commands += f"COPY {file.name} /home/\n"
-
         return f"""FROM {image_name}
 
 {self.global_env}
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
 WORKDIR /home/
-RUN apt-get update && apt-get install -y git openjdk-21-jdk
-
-{code}
-
-{copy_commands}
-
-{self.clear_env}
-
-"""
-
-
-class SpotbugsImageBaseJDK17(Image):
-    def __init__(self, pr: PullRequest, config: Config):
-        self._pr = pr
-        self._config = config
-
-    @property
-    def pr(self) -> PullRequest:
-        return self._pr
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    def dependency(self) -> Union[str, "Image"]:
-        return "ubuntu:22.04"
-
-    def image_tag(self) -> str:
-        return "base-jdk-17"
-
-    def workdir(self) -> str:
-        return "base-jdk-17"
-
-    def files(self) -> list[File]:
-        return []
-
-    def dockerfile(self) -> str:
-        image_name = self.dependency()
-        if isinstance(image_name, Image):
-            image_name = image_name.image_full_name()
-
-        if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
-        else:
-            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
-
-        copy_commands = ""
-        for file in self.files():
-            copy_commands += f"COPY {file.name} /home/\n"
-
-        return f"""FROM {image_name}
-
-{self.global_env}
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
-WORKDIR /home/
-RUN apt-get update && apt-get install -y git openjdk-17-jdk
-
-{code}
-
-{copy_commands}
-
-{self.clear_env}
-
-"""
-
-
-class SpotbugsImageBaseJDK16(Image):
-    def __init__(self, pr: PullRequest, config: Config):
-        self._pr = pr
-        self._config = config
-
-    @property
-    def pr(self) -> PullRequest:
-        return self._pr
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    def dependency(self) -> Union[str, "Image"]:
-        return "ubuntu:22.04"
-
-    def image_tag(self) -> str:
-        return "base-jdk-16"
-
-    def workdir(self) -> str:
-        return "base-jdk-16"
-
-    def files(self) -> list[File]:
-        return []
-
-    def dockerfile(self) -> str:
-        image_name = self.dependency()
-        if isinstance(image_name, Image):
-            image_name = image_name.image_full_name()
-
-        if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
-        else:
-            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
-
-        return f"""FROM {image_name}
-
-{self.global_env}
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
-WORKDIR /home/
-RUN apt-get update && apt-get install -y git openjdk-15-jdk
+RUN apt-get update && apt-get install -y git
 
 {code}
 
@@ -188,12 +68,7 @@ class SpotbugsImageDefault(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> Image | None:
-        if 1734 < self.pr.number <= 2679:
-            return SpotbugsImageBaseJDK17(self.pr, self._config)
-        elif self.pr.number <= 1734:
-            return SpotbugsImageBaseJDK16(self.pr, self._config)
-
+    def dependency(self) -> Image:
         return SpotbugsImageBase(self.pr, self._config)
 
     def image_tag(self) -> str:
@@ -202,7 +77,15 @@ class SpotbugsImageDefault(Image):
     def workdir(self) -> str:
         return f"pr-{self.pr.number}"
 
+    def _jdk_version(self) -> int:
+        if self.pr.number <= 1734:
+            return 11
+        elif self.pr.number <= 2679:
+            return 17
+        return 21
+
     def files(self) -> list[File]:
+        jdk = self._jdk_version()
         if self.pr.number <= 2679:
             return [
                 File(
@@ -242,6 +125,10 @@ exit 0
                     """#!/bin/bash
 set -e
 
+apt-get update && apt-get install -y openjdk-{jdk}-jdk
+export JAVA_HOME=/usr/lib/jvm/java-{jdk}-openjdk-$(dpkg --print-architecture)
+export PATH=$JAVA_HOME/bin:$PATH
+
 cd /home/{pr.repo}
 git reset --hard
 bash /home/check_git_changes.sh
@@ -263,7 +150,7 @@ allprojects {{
 }}
 EOF
 ./gradlew clean test --init-script ~/.gradle/init.gradle --max-workers 8 --continue || true
-""".format(pr=self.pr),
+""".format(pr=self.pr, jdk=jdk),
                 ),
                 File(
                     ".",
@@ -338,13 +225,17 @@ exit 0
                 """#!/bin/bash
 set -e
 
+apt-get update && apt-get install -y openjdk-{jdk}-jdk
+export JAVA_HOME=/usr/lib/jvm/java-{jdk}-openjdk-$(dpkg --print-architecture)
+export PATH=$JAVA_HOME/bin:$PATH
+
 cd /home/{pr.repo}
 git reset --hard
 bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
 ./gradlew clean test --continue || true
-""".format(pr=self.pr),
+""".format(pr=self.pr, jdk=jdk),
             ),
             File(
                 ".",
@@ -392,55 +283,14 @@ git apply --whitespace=nowarn /home/test.patch /home/fix.patch
             copy_commands += f"COPY {file.name} /home/\n"
 
         prepare_commands = "RUN bash /home/prepare.sh"
-        proxy_setup = ""
-        proxy_cleanup = ""
 
-        if self.global_env:
-            proxy_host = None
-            proxy_port = None
-
-            for line in self.global_env.splitlines():
-                match = re.match(
-                    r"^ENV\s*(http[s]?_proxy)=http[s]?://([^:]+):(\d+)", line
-                )
-                if match:
-                    proxy_host = match.group(2)
-                    proxy_port = match.group(3)
-                    break
-            if proxy_host and proxy_port:
-                proxy_setup = textwrap.dedent(
-                    f"""
-                    RUN mkdir -p ~/.gradle && \\
-                        if [ ! -f "$HOME/.gradle/gradle.properties" ]; then \\
-                            touch "$HOME/.gradle/gradle.properties"; \\
-                        fi && \\
-                        if ! grep -q "systemProp.http.proxyHost" "$HOME/.gradle/gradle.properties"; then \\
-                            echo 'systemProp.http.proxyHost={proxy_host}' >> "$HOME/.gradle/gradle.properties" && \\
-                            echo 'systemProp.http.proxyPort={proxy_port}' >> "$HOME/.gradle/gradle.properties" && \\
-                            echo 'systemProp.https.proxyHost={proxy_host}' >> "$HOME/.gradle/gradle.properties" && \\
-                            echo 'systemProp.https.proxyPort={proxy_port}' >> "$HOME/.gradle/gradle.properties"; \\
-                        fi && \\
-                        echo 'export GRADLE_USER_HOME=/root/.gradle' >> ~/.bashrc && \\
-                        /bin/bash -c "source ~/.bashrc"
-                """
-                )
-
-                proxy_cleanup = textwrap.dedent(
-                    """
-                    RUN rm -f ~/.gradle/gradle.properties
-                """
-                )
         return f"""FROM {name}:{tag}
 
 {self.global_env}
 
-{proxy_setup}
-
 {copy_commands}
 
 {prepare_commands}
-
-{proxy_cleanup}
 
 {self.clear_env}
 
@@ -458,7 +308,7 @@ class Spotbugs(Instance):
     def pr(self) -> PullRequest:
         return self._pr
 
-    def dependency(self) -> Optional[Image]:
+    def dependency(self) -> Image:
         return SpotbugsImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
