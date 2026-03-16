@@ -73,3 +73,5 @@ from multi_swe_bench.harness.repos.javascript.IgniteUI import *
 from multi_swe_bench.harness.repos.javascript.CVEProject import *
 from multi_swe_bench.harness.repos.javascript.Agoric import *
 from multi_swe_bench.harness.repos.javascript.City_of_Helsinki import *
+from multi_swe_bench.harness.repos.javascript.vercel.next_js import *
+
