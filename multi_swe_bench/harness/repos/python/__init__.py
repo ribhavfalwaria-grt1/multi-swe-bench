@@ -307,3 +307,4 @@ from multi_swe_bench.harness.repos.python.commaai import *
 from multi_swe_bench.harness.repos.python.scottcjn import *
 from multi_swe_bench.harness.repos.python.thenewboston_blockchain import *
 from multi_swe_bench.harness.repos.python.supadata_ai import *
+from multi_swe_bench.harness.repos.python.comet_ml import *
