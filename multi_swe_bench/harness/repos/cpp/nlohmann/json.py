@@ -6,10 +6,46 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
+def _filter_binary_patches(patch_content: str) -> str:
+    """Remove binary diff sections from a git patch.
+
+    Binary diffs (e.g., for .png, .gif files) cause 'cannot apply binary patch
+    without full index line' errors with git apply. These are typically
+    documentation assets not needed for compilation or testing.
+    """
+    if not patch_content:
+        return patch_content
+
+    lines = patch_content.split('\n')
+    result = []
+    i = 0
+    while i < len(lines):
+        if lines[i].startswith('diff --git'):
+            # Collect entire diff section and check for binary content
+            section_start = i
+            i += 1
+            is_binary = False
+            while i < len(lines) and not lines[i].startswith('diff --git'):
+                if lines[i].startswith('GIT binary patch') or lines[i].startswith('Binary files'):
+                    is_binary = True
+                i += 1
+            # Only include non-binary diff sections
+            if not is_binary:
+                result.extend(lines[section_start:i])
+        else:
+            result.append(lines[i])
+            i += 1
+    return '\n'.join(result)
+
+
 class JsonImageBase(Image):
-    def __init__(self, pr: PullRequest, config: Config):
+    def __init__(
+        self, pr: PullRequest, config: Config, gcc_version: str, tag_suffix: str
+    ):
         self._pr = pr
         self._config = config
+        self._gcc_version = gcc_version
+        self._tag_suffix = tag_suffix
 
     @property
     def pr(self) -> PullRequest:
@@ -20,13 +56,13 @@ class JsonImageBase(Image):
         return self._config
 
     def dependency(self) -> Union[str, "Image"]:
-        return "gcc:latest"
+        return f"gcc:{self._gcc_version}"
 
     def image_tag(self) -> str:
-        return "base"
+        return f"base-{self._tag_suffix}"
 
     def workdir(self) -> str:
-        return "base"
+        return f"base-{self._tag_suffix}"
 
     def files(self) -> list[File]:
         return []
@@ -47,112 +83,16 @@ class JsonImageBase(Image):
 
 WORKDIR /home/
 
-{code}
-
-RUN apt-get update && apt-get install -y libbrotli-dev libcurl4-openssl-dev
-RUN apt-get install -y clang build-essential cmake
-RUN cd /home/ && git clone https://github.com/nlohmann/json_test_data.git
-
-{self.clear_env}
-
-"""
-
-
-class JsonImageBaseCpp12(Image):
-    def __init__(self, pr: PullRequest, config: Config):
-        self._pr = pr
-        self._config = config
-
-    @property
-    def pr(self) -> PullRequest:
-        return self._pr
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    def dependency(self) -> Union[str, "Image"]:
-        return "gcc:12"
-
-    def image_tag(self) -> str:
-        return "base-cpp-12"
-
-    def workdir(self) -> str:
-        return "base-cpp-12"
-
-    def files(self) -> list[File]:
-        return []
-
-    def dockerfile(self) -> str:
-        image_name = self.dependency()
-        if isinstance(image_name, Image):
-            image_name = image_name.image_full_name()
-
-        if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
-        else:
-            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
-        return f"""FROM {image_name}
-
-{self.global_env}
-
-WORKDIR /home/
+RUN apt-get update && apt-get install -y \\
+    libbrotli-dev \\
+    libcurl4-openssl-dev \\
+    clang \\
+    build-essential \\
+    cmake \\
+    && rm -rf /var/lib/apt/lists/*
 
 {code}
 
-RUN apt-get update && apt-get install -y libbrotli-dev libcurl4-openssl-dev
-RUN apt-get install -y clang build-essential cmake
-RUN cd /home/ && git clone https://github.com/nlohmann/json_test_data.git
-
-{self.clear_env}
-
-"""
-
-
-class JsonImageBaseCpp7(Image):
-    def __init__(self, pr: PullRequest, config: Config):
-        self._pr = pr
-        self._config = config
-
-    @property
-    def pr(self) -> PullRequest:
-        return self._pr
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    def dependency(self) -> Union[str, "Image"]:
-        return "gcc:7"
-
-    def image_tag(self) -> str:
-        return "base-cpp-7"
-
-    def workdir(self) -> str:
-        return "base-cpp-7"
-
-    def files(self) -> list[File]:
-        return []
-
-    def dockerfile(self) -> str:
-        image_name = self.dependency()
-        if isinstance(image_name, Image):
-            image_name = image_name.image_full_name()
-
-        if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
-        else:
-            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
-        return f"""FROM {image_name}
-
-{self.global_env}
-
-WORKDIR /home/
-
-{code}
-
-RUN apt-get update && apt-get install -y libbrotli-dev libcurl4-openssl-dev
-RUN apt-get install -y clang build-essential cmake
 RUN cd /home/ && git clone https://github.com/nlohmann/json_test_data.git
 
 {self.clear_env}
@@ -173,13 +113,18 @@ class JsonImageDefault(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> Image | None:
-        if 2825 <= self.pr.number and self.pr.number <= 3685:
-            return JsonImageBaseCpp12(self.pr, self._config)
+    def dependency(self) -> Image:
+        if 2825 <= self.pr.number <= 3685:
+            return JsonImageBase(
+                self.pr, self._config, gcc_version="12", tag_suffix="cpp-12"
+            )
         elif self.pr.number <= 2576:
-            return JsonImageBaseCpp7(self.pr, self._config)
-
-        return JsonImageBase(self.pr, self._config)
+            return JsonImageBase(
+                self.pr, self._config, gcc_version="10", tag_suffix="cpp-10"
+            )
+        return JsonImageBase(
+            self.pr, self._config, gcc_version="latest", tag_suffix="latest"
+        )
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -188,16 +133,19 @@ class JsonImageDefault(Image):
         return f"pr-{self.pr.number}"
 
     def files(self) -> list[File]:
+        filtered_fix_patch = _filter_binary_patches(self.pr.fix_patch)
+        filtered_test_patch = _filter_binary_patches(self.pr.test_patch)
+
         return [
             File(
                 ".",
                 "fix.patch",
-                f"{self.pr.fix_patch}",
+                f"{filtered_fix_patch}",
             ),
             File(
                 ".",
                 "test.patch",
-                f"{self.pr.test_patch}",
+                f"{filtered_test_patch}",
             ),
             File(
                 ".",
@@ -245,23 +193,24 @@ set -e
 
 cd /home/{pr.repo}
 cd build
-cmake ..  
+cmake -DJSON_BuildTests=ON ..
 cmake --build .
-ctest
+ctest --output-on-failure || true
 """.format(pr=self.pr),
             ),
             File(
                 ".",
                 "test-run.sh",
                 """#!/bin/bash
-set -e
 
 cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch
+if [ -s /home/test.patch ]; then
+  git apply --whitespace=nowarn --reject /home/test.patch 2>/dev/null || true
+fi
 cd build
-cmake ..  
-cmake --build .
-ctest
+cmake -DJSON_BuildTests=ON .. || true
+cmake --build . -- -k 2>&1 || true
+ctest --output-on-failure 2>&1 || true
 
 """.format(pr=self.pr),
             ),
@@ -269,14 +218,18 @@ ctest
                 ".",
                 "fix-run.sh",
                 """#!/bin/bash
-set -e
 
 cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch /home/fix.patch
+if [ -s /home/test.patch ]; then
+  git apply --whitespace=nowarn --reject /home/test.patch 2>/dev/null || true
+fi
+if [ -s /home/fix.patch ]; then
+  git apply --whitespace=nowarn --reject /home/fix.patch 2>/dev/null || true
+fi
 cd build
-cmake ..  
-cmake --build .
-ctest
+cmake -DJSON_BuildTests=ON .. || true
+cmake --build . -- -k 2>&1 || true
+ctest --output-on-failure 2>&1 || true
 
 """.format(pr=self.pr),
             ),
@@ -343,9 +296,14 @@ class Json(Instance):
         failed_tests = set()
         skipped_tests = set()
 
-        re_pass_tests = [re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\s*Passed")]
+        re_pass_tests = [
+            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\s+Passed\s+.*$"),
+        ]
         re_fail_tests = [
-            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\s*\*+Failed$")
+            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\*\*\*Failed\s+.*$"),
+            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+.*\*\*\*Exception.*$"),
+            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\*\*\*Not Run\s+.*$"),
+            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\*\*\*Timeout\s+.*$"),
         ]
 
         for line in test_log.splitlines():
@@ -356,13 +314,13 @@ class Json(Instance):
             for re_pass_test in re_pass_tests:
                 pass_match = re_pass_test.match(line)
                 if pass_match:
-                    test = pass_match.group(1)
+                    test = pass_match.group(1).strip()
                     passed_tests.add(test)
 
             for re_fail_test in re_fail_tests:
                 fail_match = re_fail_test.match(line)
                 if fail_match:
-                    test = fail_match.group(1)
+                    test = fail_match.group(1).strip()
                     failed_tests.add(test)
 
         return TestResult(
