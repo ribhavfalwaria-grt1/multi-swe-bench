@@ -43,12 +43,11 @@ class MontePyImageBase(Image):
         else:
             code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
 
-        return f"""FROM {image_name}
+        global_env_block = f"\n{self.global_env}\n" if self.global_env else ""
+        clear_env_block = f"\n{self.clear_env}" if self.clear_env else ""
 
-{self.global_env}
-
+        return f"""FROM {image_name}{global_env_block}
 WORKDIR /home/
-ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \\
     git \\
@@ -57,10 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
 {code}
 
 WORKDIR /home/{self.pr.repo}
-RUN pip install --no-cache-dir -e ".[test]" || true
-
-{self.clear_env}
-
+RUN pip install --no-cache-dir -e ".[test]" || true{clear_env_block}
 """
 
 
@@ -161,16 +157,12 @@ git apply --whitespace=nowarn /home/test.patch /home/fix.patch
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
-        return f"""FROM {name}:{tag}
+        global_env_block = f"\n{self.global_env}\n" if self.global_env else ""
+        clear_env_block = f"\n{self.clear_env}" if self.clear_env else ""
 
-{self.global_env}
-
+        return f"""FROM {name}:{tag}{global_env_block}
 {copy_commands}
-
-RUN bash /home/prepare.sh
-
-{self.clear_env}
-
+RUN bash /home/prepare.sh{clear_env_block}
 """
 
 

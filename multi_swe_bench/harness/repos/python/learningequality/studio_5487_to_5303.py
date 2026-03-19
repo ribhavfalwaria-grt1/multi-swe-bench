@@ -48,28 +48,23 @@ class StudioJSImageBase(Image):
         else:
             code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
 
-        return f"""FROM {image_name}
+        parts = [f"FROM {image_name}"]
+        if self.global_env:
+            parts.append(self.global_env)
+        parts.append("WORKDIR /home/")
+        parts.append(
+            "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
+            "    git build-essential python3 \\\n"
+            "    && rm -rf /var/lib/apt/lists/*"
+        )
+        parts.append("RUN corepack enable && corepack prepare pnpm@10.12.4 --activate")
+        parts.append(code)
+        parts.append(f"WORKDIR /home/{self.pr.repo}")
+        parts.append("RUN pnpm install --frozen-lockfile || pnpm install || true")
+        if self.clear_env:
+            parts.append(self.clear_env)
 
-{self.global_env}
-
-WORKDIR /home/
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git build-essential python3 \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
-
-{code}
-
-WORKDIR /home/{self.pr.repo}
-
-RUN pnpm install --frozen-lockfile || pnpm install || true
-
-{self.clear_env}
-
-"""
+        return "\n\n".join(parts) + "\n"
 
 
 class StudioJSImageDefault(Image):
@@ -165,22 +160,22 @@ git apply --whitespace=nowarn /home/test.patch /home/fix.patch
         name = image.image_name()
         tag = image.image_tag()
 
-        return f"""FROM {name}:{tag}
+        parts = [f"FROM {name}:{tag}"]
+        if self.global_env:
+            parts.append(self.global_env)
+        parts.append(
+            "COPY fix.patch /home/fix.patch\n"
+            "COPY test.patch /home/test.patch\n"
+            "COPY prepare.sh /home/prepare.sh\n"
+            "COPY run.sh /home/run.sh\n"
+            "COPY test-run.sh /home/test-run.sh\n"
+            "COPY fix-run.sh /home/fix-run.sh"
+        )
+        parts.append("RUN bash /home/prepare.sh")
+        if self.clear_env:
+            parts.append(self.clear_env)
 
-{self.global_env}
-
-COPY fix.patch /home/fix.patch
-COPY test.patch /home/test.patch
-COPY prepare.sh /home/prepare.sh
-COPY run.sh /home/run.sh
-COPY test-run.sh /home/test-run.sh
-COPY fix-run.sh /home/fix-run.sh
-
-RUN bash /home/prepare.sh
-
-{self.clear_env}
-
-"""
+        return "\n\n".join(parts) + "\n"
 
 
 @Instance.register("learningequality", "studio_5487_to_5303")

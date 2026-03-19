@@ -43,12 +43,11 @@ class korniaImageBase(Image):
         else:
             code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
 
-        return f"""FROM {image_name}
+        global_env_section = f"\n{self.global_env}\n" if self.global_env else ""
+        clear_env_section = f"\n\n{self.clear_env}" if self.clear_env else ""
 
-{self.global_env}
-
+        return f"""FROM {image_name}{global_env_section}
 WORKDIR /home/
-ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -59,10 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /home/{self.pr.repo}
 RUN pip install --no-cache-dir torch --find-links https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir -e ".[dev]" || true
-
-{self.clear_env}
-
+RUN pip install --no-cache-dir -e ".[dev]" || true{clear_env_section}
 """
 
 
@@ -163,16 +159,13 @@ git apply --whitespace=nowarn /home/test.patch /home/fix.patch
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
+        global_env_section = f"\n{self.global_env}\n" if self.global_env else ""
+        clear_env_section = f"\n\n{self.clear_env}" if self.clear_env else ""
+
         return f"""FROM {name}:{tag}
-
-{self.global_env}
-
+{global_env_section}
 {copy_commands}
-
-RUN bash /home/prepare.sh
-
-{self.clear_env}
-
+RUN bash /home/prepare.sh{clear_env_section}
 """
 
 
