@@ -1,3 +1,4 @@
+from multi_swe_bench.harness.repos.java.a2aproject import *
 from multi_swe_bench.harness.repos.java.alibaba import *
 from multi_swe_bench.harness.repos.java.apache import *
 from multi_swe_bench.harness.repos.java.checkstyle import *
@@ -17,3 +18,7 @@ from multi_swe_bench.harness.repos.java.OpenRefine import *
 from multi_swe_bench.harness.repos.java.Graylog2 import *
 from multi_swe_bench.harness.repos.java.micronautprojects import *
 from multi_swe_bench.harness.repos.java.hyperledger import *
+from multi_swe_bench.harness.repos.java.OWASP import *
+from multi_swe_bench.harness.repos.java.CatimaLoyalty import *
+from multi_swe_bench.harness.repos.java.OpenElements import *
+from multi_swe_bench.harness.repos.java.FindFirst_Development import *
