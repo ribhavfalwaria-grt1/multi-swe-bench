@@ -104,3 +104,7 @@ from multi_swe_bench.harness.repos.typescript.remotion_dev import *
 from multi_swe_bench.harness.repos.typescript.tscircuit import *
 from multi_swe_bench.harness.repos.typescript.latticexyz import *
 from multi_swe_bench.harness.repos.typescript.decentralized_identity import *
+from multi_swe_bench.harness.repos.typescript.gitcoinco import *
+from multi_swe_bench.harness.repos.typescript.electron import *
+from multi_swe_bench.harness.repos.typescript.equinor import *
+from multi_swe_bench.harness.repos.typescript.hasadna import *
