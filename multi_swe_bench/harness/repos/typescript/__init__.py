@@ -98,6 +98,9 @@ from multi_swe_bench.harness.repos.typescript.Effect_TS import *
 from multi_swe_bench.harness.repos.typescript.stakwork import *
 from multi_swe_bench.harness.repos.typescript.thenewboston_blockchain import *
 
+from multi_swe_bench.harness.repos.typescript.activist_org import *
 from multi_swe_bench.harness.repos.typescript.archestra_ai import *
 from multi_swe_bench.harness.repos.typescript.remotion_dev import *
 from multi_swe_bench.harness.repos.typescript.tscircuit import *
+from multi_swe_bench.harness.repos.typescript.latticexyz import *
+from multi_swe_bench.harness.repos.typescript.decentralized_identity import *

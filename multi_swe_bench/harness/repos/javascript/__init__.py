@@ -74,6 +74,7 @@ from multi_swe_bench.harness.repos.javascript.CVEProject import *
 from multi_swe_bench.harness.repos.javascript.Agoric import *
 from multi_swe_bench.harness.repos.javascript.City_of_Helsinki import *
 from multi_swe_bench.harness.repos.javascript.cuttle_cards import *
+from multi_swe_bench.harness.repos.javascript.dinerojs import *
 from multi_swe_bench.harness.repos.javascript.vercel.next_js import *
 from multi_swe_bench.harness.repos.javascript.webpack.webpack import *
 from multi_swe_bench.harness.repos.javascript.alam00000 import *
