@@ -3,3 +3,4 @@ from multi_swe_bench.harness.repos.python.open_telemetry.opentelemetry_python_16
 from multi_swe_bench.harness.repos.python.open_telemetry.opentelemetry_python_1425_to_1218 import *
 from multi_swe_bench.harness.repos.python.open_telemetry.opentelemetry_python_567_to_340 import *
 from multi_swe_bench.harness.repos.python.open_telemetry.opentelemetry_python_311_to_235 import *
+from multi_swe_bench.harness.repos.python.open_telemetry.opentelemetry_python_4208_to_348 import *

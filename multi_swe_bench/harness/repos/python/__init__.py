@@ -288,4 +288,3 @@ from multi_swe_bench.harness.repos.python.xonsh import *
 from multi_swe_bench.harness.repos.python.zarr_developers import *
 from multi_swe_bench.harness.repos.python.zulip import *
 from multi_swe_bench.harness.repos.python.comet_ml import *
-from multi_swe_bench.harness.repos.python.marrink_lab import *
