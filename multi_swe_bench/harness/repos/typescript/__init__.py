@@ -98,6 +98,7 @@ from multi_swe_bench.harness.repos.typescript.thenewboston_blockchain import *
 from multi_swe_bench.harness.repos.typescript.tradingview import *
 from multi_swe_bench.harness.repos.typescript.trpc import *
 from multi_swe_bench.harness.repos.typescript.tscircuit import *
+from multi_swe_bench.harness.repos.typescript.decentralized_identity import *
 from multi_swe_bench.harness.repos.typescript.TypeScriptToLua import *
 from multi_swe_bench.harness.repos.typescript.VKCOM import *
 from multi_swe_bench.harness.repos.typescript.vuejs import *
