@@ -6,7 +6,7 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class CliImageBase(Image):
+class ImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -19,56 +19,11 @@ class CliImageBase(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> Union[str, "Image"]:
-        return "golang:latest"
+    def dependency(self) -> str:
+        return "golang:1.23"
 
-    def image_tag(self) -> str:
-        return "base"
-
-    def workdir(self) -> str:
-        return "base"
-
-    def files(self) -> list[File]:
-        return []
-
-    def dockerfile(self) -> str:
-        image_name = self.dependency()
-        if isinstance(image_name, Image):
-            image_name = image_name.image_full_name()
-
-        if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
-        else:
-            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
-
-        return f"""FROM {image_name}
-
-{self.global_env}
-
-WORKDIR /home/
-
-{code}
-
-{self.clear_env}
-
-"""
-
-
-class CliImageDefault(Image):
-    def __init__(self, pr: PullRequest, config: Config):
-        self._pr = pr
-        self._config = config
-
-    @property
-    def pr(self) -> PullRequest:
-        return self._pr
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    def dependency(self) -> Image | None:
-        return CliImageBase(self.pr, self.config)
+    def image_prefix(self) -> str:
+        return "mswebench"
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -163,31 +118,34 @@ go test -v -count=1 ./...
         ]
 
     def dockerfile(self) -> str:
-        image = self.dependency()
-        name = image.image_name()
-        tag = image.image_tag()
-
         copy_commands = ""
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
-        prepare_commands = "RUN bash /home/prepare.sh"
+        return f"""FROM golang:1.23
 
-        return f"""FROM {name}:{tag}
+ENV DEBIAN_FRONTEND=noninteractive
 
-{self.global_env}
+RUN apt-get update && apt-get install -y git
+
+WORKDIR /home/
+COPY fix.patch /home/
+COPY test.patch /home/
+RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}
+
+WORKDIR /home/{self.pr.repo}
+RUN git reset --hard
+RUN git checkout {self.pr.base.sha}
 
 {copy_commands}
 
-{prepare_commands}
-
-{self.clear_env}
+RUN bash /home/prepare.sh
 
 """
 
 
-@Instance.register("cli", "cli")
-class Cli(Instance):
+@Instance.register("cli", "cli_go1_23")
+class Cli_go1_23(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -198,7 +156,7 @@ class Cli(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return CliImageDefault(self.pr, self._config)
+        return ImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
