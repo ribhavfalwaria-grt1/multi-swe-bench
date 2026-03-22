@@ -1,3 +1,4 @@
+from multi_swe_bench.harness.repos.python.activeloopai import *
 from multi_swe_bench.harness.repos.python.aeon_toolkit import *
 from multi_swe_bench.harness.repos.python.aesara_devs import *
 from multi_swe_bench.harness.repos.python.AgnostiqHQ import *
@@ -19,6 +20,7 @@ from multi_swe_bench.harness.repos.python.beeware import *
 from multi_swe_bench.harness.repos.python.bigchaindb import *
 from multi_swe_bench.harness.repos.python.biopython import *
 from multi_swe_bench.harness.repos.python.BoboTiG import *
+from multi_swe_bench.harness.repos.python.bookwyrm_social import *
 from multi_swe_bench.harness.repos.python.borgbackup import *
 from multi_swe_bench.harness.repos.python.bridgecrewio import *
 from multi_swe_bench.harness.repos.python.buildbot import *
@@ -68,6 +70,7 @@ from multi_swe_bench.harness.repos.python.dstackai import *
 from multi_swe_bench.harness.repos.python.e_valuation import *
 from multi_swe_bench.harness.repos.python.EchoCog import *
 from multi_swe_bench.harness.repos.python.elastic import *
+from multi_swe_bench.harness.repos.python.encode import *
 from multi_swe_bench.harness.repos.python.enthought import *
 from multi_swe_bench.harness.repos.python.equinor import *
 from multi_swe_bench.harness.repos.python.Ericsson import *
@@ -137,6 +140,7 @@ from multi_swe_bench.harness.repos.python.matrix_org import *
 from multi_swe_bench.harness.repos.python.mesonbuild import *
 from multi_swe_bench.harness.repos.python.microsoft import *
 from multi_swe_bench.harness.repos.python.mindsdb import *
+from multi_swe_bench.harness.repos.python.mitmproxy import *
 from multi_swe_bench.harness.repos.python.mitodl import *
 from multi_swe_bench.harness.repos.python.mne_tools import *
 from multi_swe_bench.harness.repos.python.mnetools import *
@@ -219,7 +223,7 @@ from multi_swe_bench.harness.repos.python.pytroll import *
 from multi_swe_bench.harness.repos.python.pyvista import *
 from multi_swe_bench.harness.repos.python.pywbem import *
 from multi_swe_bench.harness.repos.python.qiboteam import *
-from multi_swe_bench.harness.repos.python.qiskit import *
+from multi_swe_bench.harness.repos.python.Qiskit import *
 from multi_swe_bench.harness.repos.python.randovania import *
 from multi_swe_bench.harness.repos.python.RasaHQ import *
 from multi_swe_bench.harness.repos.python.RDFLib import *
@@ -229,6 +233,7 @@ from multi_swe_bench.harness.repos.python.repobee import *
 from multi_swe_bench.harness.repos.python.rigetti import *
 from multi_swe_bench.harness.repos.python.robotframework import *
 from multi_swe_bench.harness.repos.python.rotki import *
+from multi_swe_bench.harness.repos.python.SAIC_iSmart_API import *
 from multi_swe_bench.harness.repos.python.saleor import *
 from multi_swe_bench.harness.repos.python.sanic_org import *
 from multi_swe_bench.harness.repos.python.SatelliteQE import *
@@ -284,3 +289,4 @@ from multi_swe_bench.harness.repos.python.xCDAT import *
 from multi_swe_bench.harness.repos.python.xonsh import *
 from multi_swe_bench.harness.repos.python.zarr_developers import *
 from multi_swe_bench.harness.repos.python.zulip import *
+from multi_swe_bench.harness.repos.python.comet_ml import *

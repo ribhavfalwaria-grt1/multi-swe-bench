@@ -8,6 +8,9 @@ from multi_swe_bench.harness.pull_request import PullRequest
 
 
 class ImageDefault(Image):
+    # Skip syntax directive - causes buildkitd containerd worker to crash
+    skip_syntax_directive = True
+
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
