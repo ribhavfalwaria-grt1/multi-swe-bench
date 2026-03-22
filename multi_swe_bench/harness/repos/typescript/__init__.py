@@ -47,6 +47,7 @@ from multi_swe_bench.harness.repos.typescript.facebook import *
 from multi_swe_bench.harness.repos.typescript.footprinter import *
 from multi_swe_bench.harness.repos.typescript.gitcoinco import *
 from multi_swe_bench.harness.repos.typescript.GMOD import *
+from multi_swe_bench.harness.repos.typescript.google_gemini import *
 from multi_swe_bench.harness.repos.typescript.grafana import *
 from multi_swe_bench.harness.repos.typescript.Hacker0x01 import *
 from multi_swe_bench.harness.repos.typescript.hasadna import *
@@ -87,6 +88,7 @@ from multi_swe_bench.harness.repos.typescript.Safe_DS import *
 from multi_swe_bench.harness.repos.typescript.Sage import *
 from multi_swe_bench.harness.repos.typescript.SAP import *
 from multi_swe_bench.harness.repos.typescript.Shopify import *
+from multi_swe_bench.harness.repos.typescript.sindresorhus import *
 from multi_swe_bench.harness.repos.typescript.Siteimprove import *
 from multi_swe_bench.harness.repos.typescript.SocialGouv import *
 from multi_swe_bench.harness.repos.typescript.stakwork import *
@@ -98,11 +100,9 @@ from multi_swe_bench.harness.repos.typescript.thenewboston_blockchain import *
 from multi_swe_bench.harness.repos.typescript.tradingview import *
 from multi_swe_bench.harness.repos.typescript.trpc import *
 from multi_swe_bench.harness.repos.typescript.tscircuit import *
-from multi_swe_bench.harness.repos.typescript.decentralized_identity import *
 from multi_swe_bench.harness.repos.typescript.TypeScriptToLua import *
+from multi_swe_bench.harness.repos.typescript.urql_graphql import *
 from multi_swe_bench.harness.repos.typescript.VKCOM import *
 from multi_swe_bench.harness.repos.typescript.vuejs import *
 from multi_swe_bench.harness.repos.typescript.vuetifyjs import *
 from multi_swe_bench.harness.repos.typescript.withastro import *
-from multi_swe_bench.harness.repos.typescript.google_gemini import *
-from multi_swe_bench.harness.repos.typescript.sindresorhus import *
