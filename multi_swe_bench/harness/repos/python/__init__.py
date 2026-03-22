@@ -70,6 +70,7 @@ from multi_swe_bench.harness.repos.python.dstackai import *
 from multi_swe_bench.harness.repos.python.e_valuation import *
 from multi_swe_bench.harness.repos.python.EchoCog import *
 from multi_swe_bench.harness.repos.python.elastic import *
+from multi_swe_bench.harness.repos.python.encode import *
 from multi_swe_bench.harness.repos.python.enthought import *
 from multi_swe_bench.harness.repos.python.equinor import *
 from multi_swe_bench.harness.repos.python.Ericsson import *
@@ -139,6 +140,7 @@ from multi_swe_bench.harness.repos.python.matrix_org import *
 from multi_swe_bench.harness.repos.python.mesonbuild import *
 from multi_swe_bench.harness.repos.python.microsoft import *
 from multi_swe_bench.harness.repos.python.mindsdb import *
+from multi_swe_bench.harness.repos.python.mitmproxy import *
 from multi_swe_bench.harness.repos.python.mitodl import *
 from multi_swe_bench.harness.repos.python.mne_tools import *
 from multi_swe_bench.harness.repos.python.mnetools import *
