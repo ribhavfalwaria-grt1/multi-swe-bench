@@ -119,3 +119,4 @@ from multi_swe_bench.harness.repos.typescript.website import *
 from multi_swe_bench.harness.repos.typescript.nestjs import *
 from multi_swe_bench.harness.repos.typescript.realm import *
 from multi_swe_bench.harness.repos.typescript.vendure_ecommerce import *
+from multi_swe_bench.harness.repos.typescript.typeorm import *
