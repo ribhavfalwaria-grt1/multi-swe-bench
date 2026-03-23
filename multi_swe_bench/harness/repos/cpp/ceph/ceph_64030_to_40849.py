@@ -6,7 +6,13 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class PhpImageBase(Image):
+# =============================================================================
+# G6: v19.x-v20.x Squid/Tentacle — 7 PRs
+# ubuntu:24.04, cmake + ninja, C++20/C++23, ctest
+# =============================================================================
+
+
+class ImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -19,60 +25,8 @@ class PhpImageBase(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> Union[str, "Image"]:
-        return "gcc:11"
-
-    def image_tag(self) -> str:
-        return "base"
-
-    def workdir(self) -> str:
-        return "base"
-
-    def files(self) -> list[File]:
-        return []
-
-    def dockerfile(self) -> str:
-        image_name = self.dependency()
-        if isinstance(image_name, Image):
-            image_name = image_name.image_full_name()
-
-        if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
-        else:
-            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
-
-        return f"""FROM {image_name}
-
-{self.global_env}
-
-WORKDIR /home/
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-RUN apt update && apt install -y pkg-config build-essential autoconf bison re2c \
-libxml2-dev libsqlite3-dev cmake
-
-{code}
-
-{self.clear_env}
-
-"""
-
-
-class PhpImageDefault(Image):
-    def __init__(self, pr: PullRequest, config: Config):
-        self._pr = pr
-        self._config = config
-
-    @property
-    def pr(self) -> PullRequest:
-        return self._pr
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    def dependency(self) -> Image | None:
-        return PhpImageBase(self.pr, self._config)
+    def dependency(self) -> str:
+        return "ubuntu:24.04"
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -81,6 +35,16 @@ class PhpImageDefault(Image):
         return f"pr-{self.pr.number}"
 
     def files(self) -> list[File]:
+        build_cmd = (
+            "./do_cmake.sh"
+            " -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+            " -DWITH_TESTS=ON"
+            " -DWITH_MANPAGE=OFF"
+            " -DWITH_MGR_DASHBOARD_FRONTEND=OFF"
+            " && cd build && ninja -j$(nproc)"
+        )
+        test_cmd = "cd build && ctest --output-on-failure"
+
         return [
             File(
                 ".",
@@ -119,13 +83,23 @@ exit 0
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git reset --hard
 bash /home/check_git_changes.sh
-git checkout {pr.base.sha}
+git checkout {sha}
 bash /home/check_git_changes.sh
 
-""".format(pr=self.pr),
+git submodule update --init --recursive
+apt-get update && apt-get install -y devscripts equivs
+
+if [ -f debian/control ]; then
+    sed -i 's/ceph-libboost-\([a-z-]*\)[0-9._]*-dev/libboost-\1-dev/g' debian/control
+fi
+
+./install-deps.sh || true
+apt-get install -y libboost-all-dev || true
+
+""".format(repo=self.pr.repo, sha=self.pr.base.sha),
             ),
             File(
                 ".",
@@ -133,12 +107,10 @@ bash /home/check_git_changes.sh
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
-""".format(pr=self.pr),
+cd /home/{repo}
+{build_cmd}
+{test_cmd}
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
             File(
                 ".",
@@ -146,14 +118,12 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git apply --whitespace=nowarn /home/test.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+{build_cmd}
+{test_cmd}
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
             File(
                 ".",
@@ -161,43 +131,61 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git apply --whitespace=nowarn /home/test.patch /home/fix.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+{build_cmd}
+{test_cmd}
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
         ]
 
     def dockerfile(self) -> str:
-        image = self.dependency()
-        name = image.image_name()
-        tag = image.image_tag()
+        if self.config.need_clone:
+            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
+        else:
+            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
 
         copy_commands = ""
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
-        prepare_commands = "RUN bash /home/prepare.sh"
-
-        return f"""FROM {name}:{tag}
+        return f"""FROM ubuntu:24.04
 
 {self.global_env}
 
+WORKDIR /home/
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+RUN apt-get update && apt-get install -y \\
+    build-essential \\
+    ca-certificates \\
+    cmake \\
+    curl \\
+    git \\
+    gnupg \\
+    lsb-release \\
+    ninja-build \\
+    pkg-config \\
+    python3 \\
+    python3-pip \\
+    sudo \\
+    wget \\
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+{code}
+
 {copy_commands}
 
-{prepare_commands}
+RUN bash /home/prepare.sh
 
 {self.clear_env}
 
 """
 
 
-@Instance.register("php", "php-src")
-class Php(Instance):
+@Instance.register("ceph", "ceph_64030_to_40849")
+class CEPH_64030_TO_40849(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -208,41 +196,44 @@ class Php(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return PhpImageDefault(self.pr, self._config)
+        return ImageDefault(self.pr, self._config)
+
+    _BUILD_CMD = (
+        "cd /home/ceph && "
+        "./do_cmake.sh -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_TESTS=ON "
+        "-DWITH_MANPAGE=OFF -DWITH_MGR_DASHBOARD_FRONTEND=OFF ; "
+        "cd /home/ceph/build && ninja -j$(nproc)"
+    )
+    _TEST_CMD = "cd /home/ceph/build && ctest --output-on-failure"
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
-
-        return "bash /home/run.sh"
+        return f"bash -c '{self._BUILD_CMD} ; {self._TEST_CMD}'"
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
         if test_patch_run_cmd:
             return test_patch_run_cmd
-
         return (
             "bash -c '"
-            "cd /home/php-src && "
-            "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
-            "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "cd /home/ceph && "
+            "(git apply --whitespace=nowarn /home/test.patch || "
+            "git apply --whitespace=nowarn --3way /home/test.patch || true) && "
+            f"{self._BUILD_CMD} ; {self._TEST_CMD}"
             "'"
         )
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
         if fix_patch_run_cmd:
             return fix_patch_run_cmd
-
         return (
             "bash -c '"
-            "cd /home/php-src && "
-            "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
-            "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
-            "(git apply --whitespace=nowarn /home/fix.patch 2>/dev/null || "
-            "git apply --3way --whitespace=nowarn /home/fix.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "cd /home/ceph && "
+            "(git apply --whitespace=nowarn /home/test.patch || "
+            "git apply --whitespace=nowarn --3way /home/test.patch || true) && "
+            "(git apply --whitespace=nowarn /home/fix.patch || "
+            "git apply --whitespace=nowarn --3way /home/fix.patch || true) && "
+            f"{self._BUILD_CMD} ; {self._TEST_CMD}"
             "'"
         )
 
@@ -251,8 +242,10 @@ class Php(Instance):
         failed_tests = set()
         skipped_tests = set()
 
-        re_pass_tests = [re.compile(r".*?PASS.*?\s+(.*)")]
-        re_fail_tests = [re.compile(r".*?FAIL.*?\s+(.*)")]
+        re_pass_tests = [re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\s*Passed")]
+        re_fail_tests = [
+            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\s*\*+Failed")
+        ]
 
         for line in test_log.splitlines():
             line = line.strip()

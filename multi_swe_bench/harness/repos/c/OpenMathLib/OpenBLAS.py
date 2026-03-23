@@ -136,8 +136,8 @@ set -e
 cd /home/{pr.repo}
 cd build
 cmake ..
-make -j 4
-ctest -j 4
+make -j 16
+ctest -j 4 --timeout 300
 """.format(pr=self.pr),
             ),
             File(
@@ -150,8 +150,8 @@ cd /home/{pr.repo}
 git apply --whitespace=nowarn /home/test.patch
 cd build
 cmake ..
-make -j 4
-ctest -j 4
+make -j 16
+ctest -j 4 --timeout 300
 
 """.format(pr=self.pr),
             ),
@@ -165,8 +165,8 @@ cd /home/{pr.repo}
 git apply --whitespace=nowarn /home/test.patch /home/fix.patch
 cd build
 cmake ..
-make -j 4
-ctest -j 4
+make -j 16
+ctest -j 4 --timeout 300
 
 """.format(pr=self.pr),
             ),
@@ -210,33 +210,35 @@ class OpenBLAS(Instance):
     def dependency(self) -> Optional[Image]:
         return OpenBLASImageDefault(self.pr, self._config)
 
+    _BUILD_AND_TEST = (
+        "cd /home/OpenBLAS/build && cmake .. && make -j 16 && ctest -j 4 --timeout 300"
+    )
+
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
 
-        return "bash /home/run.sh"
+        return f"bash -c 'set -e; {self._BUILD_AND_TEST}'"
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
         if test_patch_run_cmd:
             return test_patch_run_cmd
 
-        return "bash /home/test-run.sh"
+        return f"bash -c 'set -e; cd /home/OpenBLAS && git apply --whitespace=nowarn /home/test.patch; {self._BUILD_AND_TEST}'"
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
         if fix_patch_run_cmd:
             return fix_patch_run_cmd
 
-        return "bash /home/fix-run.sh"
+        return f"bash -c 'set -e; cd /home/OpenBLAS && git apply --whitespace=nowarn /home/test.patch /home/fix.patch; {self._BUILD_AND_TEST}'"
 
     def parse_log(self, test_log: str) -> TestResult:
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
 
-        re_pass_tests = [re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\s*Passed")]
-        re_fail_tests = [
-            re.compile(r"^\d+/\d+\s*Test\s*#\d+:\s*(.*?)\s*\.+\s*\*+Failed")
-        ]
+        re_pass_tests = [re.compile(r"^\d+/\d+\s+Test\s+#\d+:\s+(.*?)\s+\.+\s+Passed")]
+        re_fail_tests = [re.compile(r"^\d+/\d+\s+Test\s+#\d+:\s+(.*?)\s+\.+\*\*\*")]
 
         for line in test_log.splitlines():
             line = line.strip()

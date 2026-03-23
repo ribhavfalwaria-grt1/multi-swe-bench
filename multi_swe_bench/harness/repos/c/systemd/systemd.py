@@ -6,7 +6,17 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class PhpImageBase(Image):
+# =============================================================================
+# Default registry: G5 — v256-v257 (20 PRs on v256-stable / v257-stable)
+# ubuntu:24.04, meson==1.6.0, -Ddebug=false
+#
+# PRs without a number_interval in the JSONL land here.
+# =============================================================================
+
+
+class ImageBase(Image):
+    """G5: v256-v257 — ubuntu:24.04, meson==1.6.0, gnu11."""
+
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -20,7 +30,7 @@ class PhpImageBase(Image):
         return self._config
 
     def dependency(self) -> Union[str, "Image"]:
-        return "gcc:11"
+        return "ubuntu:24.04"
 
     def image_tag(self) -> str:
         return "base"
@@ -48,8 +58,55 @@ class PhpImageBase(Image):
 WORKDIR /home/
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
-RUN apt update && apt install -y pkg-config build-essential autoconf bison re2c \
-libxml2-dev libsqlite3-dev cmake
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cryptsetup-bin \
+    expect \
+    fdisk \
+    gettext \
+    git \
+    gperf \
+    iputils-ping \
+    itstool \
+    kbd \
+    libbpf-dev \
+    libblkid-dev \
+    libcap-dev \
+    libcurl4-gnutls-dev \
+    libfdisk-dev \
+    libfido2-dev \
+    libgpg-error-dev \
+    liblz4-dev \
+    liblzma-dev \
+    libmicrohttpd-dev \
+    libmount-dev \
+    libp11-kit-dev \
+    libpwquality-dev \
+    libqrencode-dev \
+    libssl-dev \
+    libtss2-dev \
+    libxkbcommon-dev \
+    libxtables-dev \
+    libzstd-dev \
+    mold \
+    mount \
+    net-tools \
+    pkg-config \
+    python3-evdev \
+    python3-jinja2 \
+    python3-lxml \
+    python3-pefile \
+    python3-pip \
+    python3-pyelftools \
+    python3-pyparsing \
+    python3-setuptools \
+    quota \
+    strace \
+    unifont \
+    util-linux \
+    zstd \
+    && pip3 install --break-system-packages meson==1.6.0 ninja==1.11.1.2 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 {code}
 
@@ -58,7 +115,7 @@ libxml2-dev libsqlite3-dev cmake
 """
 
 
-class PhpImageDefault(Image):
+class ImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -72,7 +129,7 @@ class PhpImageDefault(Image):
         return self._config
 
     def dependency(self) -> Image | None:
-        return PhpImageBase(self.pr, self._config)
+        return ImageBase(self.pr, self._config)
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -81,6 +138,13 @@ class PhpImageDefault(Image):
         return f"pr-{self.pr.number}"
 
     def files(self) -> list[File]:
+        build_cmd = (
+            "meson setup -Dtests=unsafe -Dslow-tests=true -Dfuzz-tests=true"
+            " --werror -Dnobody-group=nogroup -Ddebug=false build"
+            " && meson compile -C build"
+        )
+        test_cmd = "meson test -C build --print-errorlogs"
+
         return [
             File(
                 ".",
@@ -119,13 +183,13 @@ exit 0
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git reset --hard
 bash /home/check_git_changes.sh
-git checkout {pr.base.sha}
+git checkout {sha}
 bash /home/check_git_changes.sh
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, sha=self.pr.base.sha),
             ),
             File(
                 ".",
@@ -133,12 +197,10 @@ bash /home/check_git_changes.sh
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
-""".format(pr=self.pr),
+cd /home/{repo}
+{build_cmd}
+{test_cmd}
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
             File(
                 ".",
@@ -146,14 +208,12 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git apply --whitespace=nowarn /home/test.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+{build_cmd}
+{test_cmd}
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
             File(
                 ".",
@@ -161,14 +221,12 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git apply --whitespace=nowarn /home/test.patch /home/fix.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+{build_cmd}
+{test_cmd}
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
         ]
 
@@ -196,8 +254,13 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
 """
 
 
-@Instance.register("php", "php-src")
-class Php(Instance):
+# =============================================================================
+# Instance — default handler for systemd/systemd (G5 PRs with no interval)
+# =============================================================================
+
+
+@Instance.register("systemd", "systemd")
+class Systemd(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -208,12 +271,11 @@ class Php(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return PhpImageDefault(self.pr, self._config)
+        return ImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
-
         return "bash /home/run.sh"
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
@@ -222,11 +284,13 @@ class Php(Instance):
 
         return (
             "bash -c '"
-            "cd /home/php-src && "
+            "cd /home/systemd && "
             "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
             "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "meson setup -Dtests=unsafe -Dslow-tests=true -Dfuzz-tests=true"
+            " --werror -Dnobody-group=nogroup -Ddebug=false build"
+            " && meson compile -C build"
+            " && meson test -C build --print-errorlogs"
             "'"
         )
 
@@ -236,13 +300,15 @@ class Php(Instance):
 
         return (
             "bash -c '"
-            "cd /home/php-src && "
+            "cd /home/systemd && "
             "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
             "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
             "(git apply --whitespace=nowarn /home/fix.patch 2>/dev/null || "
             "git apply --3way --whitespace=nowarn /home/fix.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "meson setup -Dtests=unsafe -Dslow-tests=true -Dfuzz-tests=true"
+            " --werror -Dnobody-group=nogroup -Ddebug=false build"
+            " && meson compile -C build"
+            " && meson test -C build --print-errorlogs"
             "'"
         )
 
@@ -251,25 +317,31 @@ class Php(Instance):
         failed_tests = set()
         skipped_tests = set()
 
-        re_pass_tests = [re.compile(r".*?PASS.*?\s+(.*)")]
-        re_fail_tests = [re.compile(r".*?FAIL.*?\s+(.*)")]
+        # Meson test output format:
+        #  1/128 test-name                 OK              0.03s
+        #  2/128 test-name                 FAIL            0.05s
+        #  3/128 test-name                 SKIP            0.01s
+        #  4/128 test-name                 EXPECTEDFAIL    0.02s
+        #  5/128 test-name                 TIMEOUT         30.00s
+        re_result = re.compile(
+            r"^\s*\d+/\d+\s+(.+?)\s+(OK|FAIL|SKIP|EXPECTEDFAIL|TIMEOUT|ERROR)\s+[\d.]+s"
+        )
 
         for line in test_log.splitlines():
             line = line.strip()
             if not line:
                 continue
 
-            for re_pass_test in re_pass_tests:
-                pass_match = re_pass_test.match(line)
-                if pass_match:
-                    test = pass_match.group(1)
-                    passed_tests.add(test)
-
-            for re_fail_test in re_fail_tests:
-                fail_match = re_fail_test.match(line)
-                if fail_match:
-                    test = fail_match.group(1)
-                    failed_tests.add(test)
+            match = re_result.match(line)
+            if match:
+                test_name = match.group(1)
+                status = match.group(2)
+                if status == "OK":
+                    passed_tests.add(test_name)
+                elif status in ("FAIL", "TIMEOUT", "ERROR"):
+                    failed_tests.add(test_name)
+                elif status in ("SKIP", "EXPECTEDFAIL"):
+                    skipped_tests.add(test_name)
 
         return TestResult(
             passed_count=len(passed_tests),

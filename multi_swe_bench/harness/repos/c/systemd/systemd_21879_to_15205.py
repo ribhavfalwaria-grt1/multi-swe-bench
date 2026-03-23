@@ -6,7 +6,15 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class PhpImageBase(Image):
+# =============================================================================
+# G3: v250-v251 — PRs {21879, 15205}
+# GH Actions, ubuntu:20.04, meson==0.63.2, install_tag workaround
+# =============================================================================
+
+
+class ImageDefault(Image):
+    """G3: v250-v251 — ubuntu:20.04, pinned meson==0.63.2, +libbpf +libtss2."""
+
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -19,60 +27,8 @@ class PhpImageBase(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> Union[str, "Image"]:
-        return "gcc:11"
-
-    def image_tag(self) -> str:
-        return "base"
-
-    def workdir(self) -> str:
-        return "base"
-
-    def files(self) -> list[File]:
-        return []
-
-    def dockerfile(self) -> str:
-        image_name = self.dependency()
-        if isinstance(image_name, Image):
-            image_name = image_name.image_full_name()
-
-        if self.config.need_clone:
-            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
-        else:
-            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
-
-        return f"""FROM {image_name}
-
-{self.global_env}
-
-WORKDIR /home/
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-RUN apt update && apt install -y pkg-config build-essential autoconf bison re2c \
-libxml2-dev libsqlite3-dev cmake
-
-{code}
-
-{self.clear_env}
-
-"""
-
-
-class PhpImageDefault(Image):
-    def __init__(self, pr: PullRequest, config: Config):
-        self._pr = pr
-        self._config = config
-
-    @property
-    def pr(self) -> PullRequest:
-        return self._pr
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    def dependency(self) -> Image | None:
-        return PhpImageBase(self.pr, self._config)
+    def dependency(self) -> str:
+        return "ubuntu:20.04"
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -81,6 +37,13 @@ class PhpImageDefault(Image):
         return f"pr-{self.pr.number}"
 
     def files(self) -> list[File]:
+        build_cmd = (
+            "meson setup -Dtests=unsafe -Dslow-tests=true -Dfuzz-tests=true"
+            " --werror -Dnobody-group=nogroup build"
+            " && meson compile -C build"
+        )
+        test_cmd = "meson test -C build --print-errorlogs"
+
         return [
             File(
                 ".",
@@ -119,13 +82,14 @@ exit 0
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git reset --hard
 bash /home/check_git_changes.sh
-git checkout {pr.base.sha}
+git checkout {sha}
 bash /home/check_git_changes.sh
+find . -name meson.build -exec sed -i '/install_tag/d' {{}} \\;
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, sha=self.pr.base.sha),
             ),
             File(
                 ".",
@@ -133,12 +97,10 @@ bash /home/check_git_changes.sh
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
-""".format(pr=self.pr),
+cd /home/{repo}
+{build_cmd}
+{test_cmd}
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
             File(
                 ".",
@@ -146,14 +108,12 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git apply --whitespace=nowarn /home/test.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+{build_cmd}
+{test_cmd}
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
             File(
                 ".",
@@ -161,43 +121,94 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
                 """#!/bin/bash
 set -e
 
-cd /home/{pr.repo}
+cd /home/{repo}
 git apply --whitespace=nowarn /home/test.patch /home/fix.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+{build_cmd}
+{test_cmd}
 
-""".format(pr=self.pr),
+""".format(repo=self.pr.repo, build_cmd=build_cmd, test_cmd=test_cmd),
             ),
         ]
 
     def dockerfile(self) -> str:
-        image = self.dependency()
-        name = image.image_name()
-        tag = image.image_tag()
+        if self.config.need_clone:
+            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
+        else:
+            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
 
         copy_commands = ""
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
-        prepare_commands = "RUN bash /home/prepare.sh"
-
-        return f"""FROM {name}:{tag}
+        return f"""FROM ubuntu:20.04
 
 {self.global_env}
 
+WORKDIR /home/
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cryptsetup-bin \
+    expect \
+    fdisk \
+    gettext \
+    git \
+    gperf \
+    iputils-ping \
+    isc-dhcp-client \
+    itstool \
+    kbd \
+    libbpf-dev \
+    libblkid-dev \
+    libcap-dev \
+    libcurl4-gnutls-dev \
+    libfdisk-dev \
+    libfido2-dev \
+    libgpg-error-dev \
+    liblz4-dev \
+    liblzma-dev \
+    libmicrohttpd-dev \
+    libmount-dev \
+    libp11-kit-dev \
+    libpwquality-dev \
+    libqrencode-dev \
+    libssl-dev \
+    libtss2-dev \
+    libxkbcommon-dev \
+    libxtables-dev \
+    libzstd-dev \
+    mount \
+    net-tools \
+    perl \
+    pkg-config \
+    python3-evdev \
+    python3-jinja2 \
+    python3-lxml \
+    python3-pip \
+    python3-pyparsing \
+    python3-setuptools \
+    quota \
+    strace \
+    unifont \
+    util-linux \
+    zstd \
+    && pip3 install meson==0.63.2 ninja==1.10.2.4 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+{code}
+
 {copy_commands}
 
-{prepare_commands}
+RUN bash /home/prepare.sh
 
 {self.clear_env}
 
 """
 
 
-@Instance.register("php", "php-src")
-class Php(Instance):
+@Instance.register("systemd", "systemd_21879_to_15205")
+class SYSTEMD_21879_TO_15205(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -208,12 +219,11 @@ class Php(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return PhpImageDefault(self.pr, self._config)
+        return ImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
-
         return "bash /home/run.sh"
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
@@ -222,11 +232,13 @@ class Php(Instance):
 
         return (
             "bash -c '"
-            "cd /home/php-src && "
+            "cd /home/systemd && "
             "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
             "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "meson setup -Dtests=unsafe -Dslow-tests=true -Dfuzz-tests=true"
+            " --werror -Dnobody-group=nogroup build"
+            " && meson compile -C build"
+            " && meson test -C build --print-errorlogs"
             "'"
         )
 
@@ -236,13 +248,15 @@ class Php(Instance):
 
         return (
             "bash -c '"
-            "cd /home/php-src && "
+            "cd /home/systemd && "
             "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
             "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
             "(git apply --whitespace=nowarn /home/fix.patch 2>/dev/null || "
             "git apply --3way --whitespace=nowarn /home/fix.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "meson setup -Dtests=unsafe -Dslow-tests=true -Dfuzz-tests=true"
+            " --werror -Dnobody-group=nogroup build"
+            " && meson compile -C build"
+            " && meson test -C build --print-errorlogs"
             "'"
         )
 
@@ -251,25 +265,25 @@ class Php(Instance):
         failed_tests = set()
         skipped_tests = set()
 
-        re_pass_tests = [re.compile(r".*?PASS.*?\s+(.*)")]
-        re_fail_tests = [re.compile(r".*?FAIL.*?\s+(.*)")]
+        re_result = re.compile(
+            r"^\s*\d+/\d+\s+(.+?)\s+(OK|FAIL|SKIP|EXPECTEDFAIL|TIMEOUT|ERROR)\s+[\d.]+s"
+        )
 
         for line in test_log.splitlines():
             line = line.strip()
             if not line:
                 continue
 
-            for re_pass_test in re_pass_tests:
-                pass_match = re_pass_test.match(line)
-                if pass_match:
-                    test = pass_match.group(1)
-                    passed_tests.add(test)
-
-            for re_fail_test in re_fail_tests:
-                fail_match = re_fail_test.match(line)
-                if fail_match:
-                    test = fail_match.group(1)
-                    failed_tests.add(test)
+            match = re_result.match(line)
+            if match:
+                test_name = match.group(1)
+                status = match.group(2)
+                if status == "OK":
+                    passed_tests.add(test_name)
+                elif status in ("FAIL", "TIMEOUT", "ERROR"):
+                    failed_tests.add(test_name)
+                elif status in ("SKIP", "EXPECTEDFAIL"):
+                    skipped_tests.add(test_name)
 
         return TestResult(
             passed_count=len(passed_tests),

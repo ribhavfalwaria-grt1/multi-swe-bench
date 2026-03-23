@@ -146,6 +146,7 @@ RUN git clone https://github.com/CraveFood/farmblocks.git /home/farmblocks
 WORKDIR /home/farmblocks
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+RUN yarn install
 """
         dockerfile_content += f"""
 {copy_commands}

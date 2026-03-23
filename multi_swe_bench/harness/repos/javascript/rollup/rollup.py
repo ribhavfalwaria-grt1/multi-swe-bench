@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Optional, Union
 
@@ -6,7 +7,7 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class PhpImageBase(Image):
+class ImageBase(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -20,7 +21,7 @@ class PhpImageBase(Image):
         return self._config
 
     def dependency(self) -> Union[str, "Image"]:
-        return "gcc:11"
+        return "node:20-bookworm"
 
     def image_tag(self) -> str:
         return "base"
@@ -46,10 +47,7 @@ class PhpImageBase(Image):
 {self.global_env}
 
 WORKDIR /home/
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-RUN apt update && apt install -y pkg-config build-essential autoconf bison re2c \
-libxml2-dev libsqlite3-dev cmake
+RUN apt update && apt install -y git build-essential
 
 {code}
 
@@ -58,7 +56,7 @@ libxml2-dev libsqlite3-dev cmake
 """
 
 
-class PhpImageDefault(Image):
+class ImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -72,7 +70,7 @@ class PhpImageDefault(Image):
         return self._config
 
     def dependency(self) -> Image | None:
-        return PhpImageBase(self.pr, self._config)
+        return ImageBase(self.pr, self.config)
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -124,6 +122,8 @@ git reset --hard
 bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
+npm install || true
+npm run build:cjs || npm run build || true
 
 """.format(pr=self.pr),
             ),
@@ -134,10 +134,8 @@ bash /home/check_git_changes.sh
 set -e
 
 cd /home/{pr.repo}
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+npm run test:only -- --reporter json 2>&1 || true
+
 """.format(pr=self.pr),
             ),
             File(
@@ -147,11 +145,8 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
 set -e
 
 cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+git apply --exclude package-lock.json --whitespace=nowarn /home/test.patch
+npm run test:only -- --reporter json 2>&1 || true
 
 """.format(pr=self.pr),
             ),
@@ -162,11 +157,8 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
 set -e
 
 cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch /home/fix.patch
-./buildconf
-./configure --enable-debug
-make -j4
-make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
+git apply --exclude package-lock.json --whitespace=nowarn /home/test.patch /home/fix.patch
+npm run test:only -- --reporter json 2>&1 || true
 
 """.format(pr=self.pr),
             ),
@@ -196,8 +188,8 @@ make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test
 """
 
 
-@Instance.register("php", "php-src")
-class Php(Instance):
+@Instance.register("rollup", "rollup")
+class Rollup(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -208,26 +200,31 @@ class Php(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return PhpImageDefault(self.pr, self._config)
+        return ImageDefault(self.pr, self._config)
+
+    _NPM_ENSURE = "[ -d node_modules ] || npm install || true"
+    _BUILD = "npm run build:cjs || npm run build || true"
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
 
-        return "bash /home/run.sh"
+        return (
+            f"bash -c 'set -e; cd /home/{self.pr.repo}; "
+            f"{self._NPM_ENSURE}; "
+            f"npm run test:only -- --reporter json 2>&1 || true'"
+        )
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
         if test_patch_run_cmd:
             return test_patch_run_cmd
 
         return (
-            "bash -c '"
-            "cd /home/php-src && "
-            "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
-            "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
-            "'"
+            f"bash -c 'set -e; cd /home/{self.pr.repo}; "
+            f"{self._NPM_ENSURE}; "
+            f"git apply --exclude package-lock.json --whitespace=nowarn /home/test.patch; "
+            f"{self._BUILD}; "
+            f"npm run test:only -- --reporter json 2>&1 || true'"
         )
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
@@ -235,15 +232,11 @@ class Php(Instance):
             return fix_patch_run_cmd
 
         return (
-            "bash -c '"
-            "cd /home/php-src && "
-            "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
-            "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
-            "(git apply --whitespace=nowarn /home/fix.patch 2>/dev/null || "
-            "git apply --3way --whitespace=nowarn /home/fix.patch 2>/dev/null || true) && "
-            "./buildconf && ./configure --enable-debug && make -j4 && "
-            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
-            "'"
+            f"bash -c 'set -e; cd /home/{self.pr.repo}; "
+            f"{self._NPM_ENSURE}; "
+            f"git apply --exclude package-lock.json --whitespace=nowarn /home/test.patch /home/fix.patch; "
+            f"{self._BUILD}; "
+            f"npm run test:only -- --reporter json 2>&1 || true'"
         )
 
     def parse_log(self, test_log: str) -> TestResult:
@@ -251,25 +244,37 @@ class Php(Instance):
         failed_tests = set()
         skipped_tests = set()
 
-        re_pass_tests = [re.compile(r".*?PASS.*?\s+(.*)")]
-        re_fail_tests = [re.compile(r".*?FAIL.*?\s+(.*)")]
+        # Clean log for JSON extraction
+        test_log = re.sub(r"^(=+|Writing .*)$", "", test_log, flags=re.MULTILINE)
+        test_log = test_log.replace("\r\n", "")
+        test_log = test_log.replace("\n", "")
 
-        for line in test_log.splitlines():
-            line = line.strip()
-            if not line:
-                continue
+        # Find JSON objects in the output
+        decoder = json.JSONDecoder()
+        pos = 0
+        while True:
+            match = test_log.find("{", pos)
+            if match == -1:
+                break
+            try:
+                result, index = decoder.raw_decode(test_log[match:])
+                if isinstance(result, dict) and "stats" in result:
+                    for t in result.get("passes", []):
+                        passed_tests.add(t.get("fullTitle", t.get("title", "")))
+                    for t in result.get("failures", []):
+                        failed_tests.add(t.get("fullTitle", t.get("title", "")))
+                    for t in result.get("pending", []):
+                        skipped_tests.add(t.get("fullTitle", t.get("title", "")))
+                pos = match + index
+            except ValueError:
+                pos = match + 1
 
-            for re_pass_test in re_pass_tests:
-                pass_match = re_pass_test.match(line)
-                if pass_match:
-                    test = pass_match.group(1)
-                    passed_tests.add(test)
-
-            for re_fail_test in re_fail_tests:
-                fail_match = re_fail_test.match(line)
-                if fail_match:
-                    test = fail_match.group(1)
-                    failed_tests.add(test)
+        # Remove overlaps
+        for test in failed_tests:
+            passed_tests.discard(test)
+            skipped_tests.discard(test)
+        for test in skipped_tests:
+            passed_tests.discard(test)
 
         return TestResult(
             passed_count=len(passed_tests),
