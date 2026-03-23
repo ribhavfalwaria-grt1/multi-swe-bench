@@ -1,12 +1,13 @@
 import re
-from typing import Optional, Union
 import textwrap
+from typing import Optional, Union
+
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
-class prettierImageBase(Image):
+class serverlessImageBase(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -20,7 +21,7 @@ class prettierImageBase(Image):
         return self._config
 
     def dependency(self) -> Union[str, "Image"]:
-        return "node:20"
+        return "node:18"
 
     def image_tag(self) -> str:
         return "base"
@@ -49,8 +50,6 @@ WORKDIR /home/
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
-RUN apt update && apt install -y pkg-config build-essential python3 libkrb5-dev
-
 {code}
 
 {self.clear_env}
@@ -58,7 +57,7 @@ RUN apt update && apt install -y pkg-config build-essential python3 libkrb5-dev
 """
 
 
-class prettierImageDefault(Image):
+class serverlessImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -72,7 +71,7 @@ class prettierImageDefault(Image):
         return self._config
 
     def dependency(self) -> Image | None:
-        return prettierImageBase(self.pr, self._config)
+        return serverlessImageBase(self.pr, self._config)
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -124,10 +123,7 @@ git reset --hard
 bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
-
-corepack enable || true
-yes | yarn -v || true
-yarn || true
+npm install || true
 """.format(pr=self.pr),
             ),
             File(
@@ -135,13 +131,10 @@ yarn || true
                 "run.sh",
                 """#!/bin/bash
 set -e
-cd /home/{pr.repo}
 
-corepack enable || true
-yarn || true
-find node_modules -name 'index.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
-find node_modules -name 'requireOrImportModule.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
-yarn test --forceExit --runInBand
+cd /home/{pr.repo}
+npm install || true
+npx mocha "lib/**/*.test.js" "test/unit/**/*.test.js" --timeout 10000 || true
 """.format(pr=self.pr),
             ),
             File(
@@ -149,15 +142,11 @@ yarn test --forceExit --runInBand
                 "test-run.sh",
                 """#!/bin/bash
 set -e
+
 cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch
-
-corepack enable || true
-yarn || true
-find node_modules -name 'index.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
-find node_modules -name 'requireOrImportModule.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
-yarn test --forceExit --runInBand
-
+git apply --exclude package-lock.json --whitespace=nowarn /home/test.patch
+npm install || true
+npx mocha "lib/**/*.test.js" "test/unit/**/*.test.js" --timeout 10000 || true
 """.format(pr=self.pr),
             ),
             File(
@@ -165,15 +154,11 @@ yarn test --forceExit --runInBand
                 "fix-run.sh",
                 """#!/bin/bash
 set -e
+
 cd /home/{pr.repo}
-git apply --whitespace=nowarn /home/test.patch /home/fix.patch
-
-corepack enable || true
-yarn || true
-find node_modules -name 'index.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
-find node_modules -name 'requireOrImportModule.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
-yarn test --forceExit --runInBand
-
+git apply --exclude package-lock.json --whitespace=nowarn /home/test.patch /home/fix.patch
+npm install || true
+npx mocha "lib/**/*.test.js" "test/unit/**/*.test.js" --timeout 10000 || true
 """.format(pr=self.pr),
             ),
         ]
@@ -187,6 +172,7 @@ yarn test --forceExit --runInBand
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
+        prepare_commands = "RUN bash /home/prepare.sh"
         proxy_setup = ""
         proxy_cleanup = ""
 
@@ -219,7 +205,6 @@ yarn test --forceExit --runInBand
                     RUN rm -f $HOME/.npmrc
                 """
                 )
-
         return f"""FROM {name}:{tag}
 
 {self.global_env}
@@ -228,18 +213,17 @@ yarn test --forceExit --runInBand
 
 {copy_commands}
 
-RUN bash /home/prepare.sh
+{prepare_commands}
 
 {proxy_cleanup}
 
 {self.clear_env}
 
-CMD ["/bin/bash"]
 """
 
 
-@Instance.register("prettier", "prettier")
-class prettier(Instance):
+@Instance.register("serverless", "serverless")
+class Serverless(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -250,7 +234,7 @@ class prettier(Instance):
         return self._pr
 
     def dependency(self) -> Optional[Image]:
-        return prettierImageDefault(self.pr, self._config)
+        return serverlessImageDefault(self.pr, self._config)
 
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
@@ -283,15 +267,19 @@ class prettier(Instance):
         failed_res = [
             re.compile(r"FAIL:?\s+([^\(]+)"),
             re.compile(r"\s*[×✗]\s+(.*?)(?:\s*\(\d+(?:\.\d+)?\s*(?:ms|s)\))?\s*$"),
-            re.compile(r"^\s*\d+\)\s+(.*?)(?:\s*\(\d+(?:\.\d+)?\s*(?:ms|s)\))?\s*$"),
+            re.compile(
+                r"^(?!\s*\(node:)\s*\d+\)\s+(.*?)(?:\s*\(\d+(?:\.\d+)?\s*(?:ms|s)\))?\s*$"
+            ),
         ]
 
         skipped_res = [
             re.compile(r"SKIP:?\s+([^\(]+)"),
         ]
+
         ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
         for line in test_log.splitlines():
             line = ansi_escape.sub("", line)
+            line = line.strip()
             for passed_re in passed_res:
                 m = passed_re.search(line)
                 if m and m.group(1) not in failed_tests:
@@ -308,6 +296,11 @@ class prettier(Instance):
                 m = skipped_re.search(line)
                 if m:
                     skipped_tests.add(m.group(1))
+
+        if failed_tests:
+            failed_tests.add("ToTal_Test")
+        else:
+            passed_tests.add("ToTal_Test")
 
         return TestResult(
             passed_count=len(passed_tests),
