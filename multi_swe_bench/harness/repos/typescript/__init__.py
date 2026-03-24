@@ -122,3 +122,4 @@ from multi_swe_bench.harness.repos.typescript.vendure_ecommerce import *
 from multi_swe_bench.harness.repos.typescript.typeorm import *
 from multi_swe_bench.harness.repos.typescript.strapi import *
 from multi_swe_bench.harness.repos.typescript.urql_graphql import *
+from multi_swe_bench.harness.repos.typescript.blitz_js import *

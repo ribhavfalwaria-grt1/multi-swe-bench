@@ -16,3 +16,4 @@ from multi_swe_bench.harness.repos.cpp.AMReXCodes import *
 from multi_swe_bench.harness.repos.cpp.google import *
 from multi_swe_bench.harness.repos.cpp.msgpack import *
 from multi_swe_bench.harness.repos.cpp.duckdb import *
+from multi_swe_bench.harness.repos.cpp.microsoft import *
