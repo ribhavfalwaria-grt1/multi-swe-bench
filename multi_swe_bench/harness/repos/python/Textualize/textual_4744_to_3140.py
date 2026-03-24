@@ -139,7 +139,6 @@ RUN git checkout {pr.base.sha}
 
 
 @Instance.register("Textualize", "textual_4744_to_3140")
-@Instance.register("textualize", "textual_4744_to_3140")
 class TEXTUAL_4744_TO_3140(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
@@ -153,23 +152,25 @@ class TEXTUAL_4744_TO_3140(Instance):
     def dependency(self) -> Optional[Image]:
         return ImageDefault(self.pr, self._config)
 
+    _POETRY_ENSURE = "pip install poetry==1.7.1 2>/dev/null || true; poetry install --no-interaction --extras syntax 2>/dev/null || true"
+    _TEST_CMD = "poetry run pytest tests -v --cov=./src/textual --cov-report=xml:./coverage.xml --cov-report term-missing"
+
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
-
-        return "bash /home/run.sh"
+        return (
+            f"bash -c 'cd /home/textual && {self._POETRY_ENSURE} && {self._TEST_CMD}'"
+        )
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
         if test_patch_run_cmd:
             return test_patch_run_cmd
-
-        return "bash /home/test-run.sh"
+        return f"bash -c 'cd /home/textual && git apply --whitespace=nowarn /home/test.patch && {self._POETRY_ENSURE} && {self._TEST_CMD}'"
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
         if fix_patch_run_cmd:
             return fix_patch_run_cmd
-
-        return "bash /home/fix-run.sh"
+        return f"bash -c 'cd /home/textual && git apply --whitespace=nowarn /home/test.patch /home/fix.patch && {self._POETRY_ENSURE} && {self._TEST_CMD}'"
 
     def parse_log(self, log: str) -> TestResult:
         # Parse the log content and extract test execution results.

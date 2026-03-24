@@ -119,7 +119,7 @@ if [ -f turbo.json ]; then
     # Fix ajv type conflict between hoisted and workspace ajv versions
     find /home/{repo} -name "tsconfig*.json" -not -path "*/node_modules/*" -exec \
       sed -i 's/"compilerOptions": {{/"compilerOptions": {{ "skipLibCheck": true,/' {{}} \; 2>/dev/null || true
-    npx turbo@1.13.3 run build
+    npx turbo@1.13.3 run build || true
     npx turbo@1.13.3 run test:unit
 else
     npm run test:unit
@@ -144,7 +144,7 @@ find /home/{repo} -name "tsconfig*.json" -not -path "*/node_modules/*" -exec \
   sed -i 's/"compilerOptions": {{/"compilerOptions": {{ "skipLibCheck": true,/' {{}} \; 2>/dev/null || true
 
 if [ -f turbo.json ]; then
-    npx turbo@1.13.3 run build
+    npx turbo@1.13.3 run build || true
     npx turbo@1.13.3 run test:unit
 else
     npm run test:unit
@@ -169,7 +169,7 @@ find /home/{repo} -name "tsconfig*.json" -not -path "*/node_modules/*" -exec \\
   sed -i 's/"compilerOptions": {{/"compilerOptions": {{ "skipLibCheck": true,/' {{}} \\; 2>/dev/null || true
 
 if [ -f turbo.json ]; then
-    npx turbo@1.13.3 run build
+    npx turbo@1.13.3 run build || true
     npx turbo@1.13.3 run test:unit
 else
     npm run test:unit

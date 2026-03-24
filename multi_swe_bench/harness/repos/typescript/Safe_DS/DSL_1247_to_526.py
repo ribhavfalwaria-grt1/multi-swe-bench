@@ -48,65 +48,66 @@ class ImageDefault(Image):
             File(
                 ".",
                 "prepare.sh",
-                """ls -la
-###ACTION_DELIMITER###
-npm install
-###ACTION_DELIMITER###
-npm test -- --verbose
-###ACTION_DELIMITER###
-npx vitest --help
-###ACTION_DELIMITER###
-npm test -- --reporter verbose
-###ACTION_DELIMITER###
-sysctl fs.inotify.max_user_watches=524288
-###ACTION_DELIMITER###
-sysctl -w fs.inotify.max_user_watches=524288
-###ACTION_DELIMITER###
-npm test -- --reporter verbose --run
-###ACTION_DELIMITER###
-npm run langium:generate
-###ACTION_DELIMITER###
+                """#!/bin/bash
+set -e
+cd /home/[[REPO_NAME]]
+npm ci 2>/dev/null || npm install
+npm run langium:generate 2>/dev/null || true
 npm run build
-###ACTION_DELIMITER###
-npm test -- --reporter verbose --run
-###ACTION_DELIMITER###
-echo 'npm test -- --reporter verbose --run' > test_commands.sh
-###ACTION_DELIMITER###
-bash test_commands.sh""",
+""".replace("[[REPO_NAME]]", repo_name),
             ),
             File(
                 ".",
                 "run.sh",
                 """#!/bin/bash
+set -e
 cd /home/[[REPO_NAME]]
-npm test -- --reporter verbose --run
-
+rm -f /tmp/results.json
+npx vitest --reporter=json --outputFile=/tmp/results.json --reporter=verbose --run 2>&1 || true
+echo "###VITEST_JSON_START###"
+cat /tmp/results.json 2>/dev/null || echo '{"testResults":[],"numTotalTests":0}'
+echo ""
+echo "###VITEST_JSON_END###"
 """.replace("[[REPO_NAME]]", repo_name),
             ),
             File(
                 ".",
                 "test-run.sh",
                 """#!/bin/bash
+set -e
 cd /home/[[REPO_NAME]]
-if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn /home/test.patch; then
+if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='package-lock.json' --exclude='**/package-lock.json' /home/test.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-npm test -- --reporter verbose --run
-
+npm run langium:generate 2>/dev/null || true
+npm run build 2>&1 || true
+rm -f /tmp/results.json
+npx vitest --reporter=json --outputFile=/tmp/results.json --reporter=verbose --run 2>&1 || true
+echo "###VITEST_JSON_START###"
+cat /tmp/results.json 2>/dev/null || echo '{"testResults":[],"numTotalTests":0}'
+echo ""
+echo "###VITEST_JSON_END###"
 """.replace("[[REPO_NAME]]", repo_name),
             ),
             File(
                 ".",
                 "fix-run.sh",
                 """#!/bin/bash
+set -e
 cd /home/[[REPO_NAME]]
-if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='package-lock.json' --exclude='**/package-lock.json' /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-npm test -- --reporter verbose --run
-
+npm run langium:generate 2>/dev/null || true
+npm run build 2>&1 || true
+rm -f /tmp/results.json
+npx vitest --reporter=json --outputFile=/tmp/results.json --reporter=verbose --run 2>&1 || true
+echo "###VITEST_JSON_START###"
+cat /tmp/results.json 2>/dev/null || echo '{"testResults":[],"numTotalTests":0}'
+echo ""
+echo "###VITEST_JSON_END###"
 """.replace("[[REPO_NAME]]", repo_name),
             ),
         ]
@@ -147,6 +148,7 @@ RUN git checkout {pr.base.sha}
 """
         dockerfile_content += f"""
 {copy_commands}
+RUN bash /home/prepare.sh
 """
         return dockerfile_content.format(pr=self.pr)
 
@@ -184,29 +186,40 @@ class DSL_1247_TO_526(Instance):
         return "bash /home/fix-run.sh"
 
     def parse_log(self, log: str) -> TestResult:
-        # Parse the log content and extract test execution results.
-        passed_tests = set()  # Tests that passed successfully
-        failed_tests = set()  # Tests that failed
-        skipped_tests = set()  # Tests that were skipped
-        import re
-        import json
+        passed_tests: set[str] = set()
+        failed_tests: set[str] = set()
+        skipped_tests: set[str] = set()
 
-        # Parse passed tests
-        passed_pattern = re.compile(r"✓\s+(.*?)( \d+ms)?$", re.MULTILINE)
-        passed_matches = passed_pattern.findall(log)
-        passed_tests = set(match[0].strip() for match in passed_matches)
-        # Parse failed tests
-        failed_pattern = re.compile(r"FAIL\s+(.*)$", re.MULTILINE)
-        failed_tests = set(failed_pattern.findall(log))
-        # Parse skipped tests (placeholder)
-        skipped_pattern = re.compile(r"^(↓|SKIPPED) (.*)$", re.MULTILINE)
-        skipped_matches = skipped_pattern.findall(log)
-        skipped_tests = set(match[1].strip() for match in skipped_matches)
-        parsed_results = {
-            "passed_tests": passed_tests,
-            "failed_tests": failed_tests,
-            "skipped_tests": skipped_tests,
-        }
+        start_marker = "###VITEST_JSON_START###"
+        end_marker = "###VITEST_JSON_END###"
+        start_idx = log.find(start_marker)
+        end_idx = log.find(end_marker)
+
+        if start_idx != -1 and end_idx != -1:
+            json_str = log[start_idx + len(start_marker):end_idx].strip()
+            try:
+                data = json.loads(json_str)
+                for test_file in data.get("testResults", []):
+                    file_path = test_file.get("name", "")
+                    for assertion in test_file.get("assertionResults", []):
+                        full_name = assertion.get("fullName", "").strip()
+                        status = assertion.get("status", "")
+                        if not full_name:
+                            title = assertion.get("title", "unknown")
+                            ancestors = assertion.get("ancestorTitles", [])
+                            full_name = " ".join(
+                                [a for a in ancestors if a] + [title]
+                            ).strip()
+                        if not full_name:
+                            continue
+                        if status == "passed":
+                            passed_tests.add(full_name)
+                        elif status == "failed":
+                            failed_tests.add(full_name)
+                        elif status in ("skipped", "pending", "todo", "disabled"):
+                            skipped_tests.add(full_name)
+            except json.JSONDecodeError:
+                pass
 
         return TestResult(
             passed_count=len(passed_tests),

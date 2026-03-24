@@ -6,6 +6,58 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
+class prettierImageBase(Image):
+    def __init__(self, pr: PullRequest, config: Config):
+        self._pr = pr
+        self._config = config
+
+    @property
+    def pr(self) -> PullRequest:
+        return self._pr
+
+    @property
+    def config(self) -> Config:
+        return self._config
+
+    def dependency(self) -> Union[str, "Image"]:
+        return "node:20"
+
+    def image_tag(self) -> str:
+        return "base"
+
+    def workdir(self) -> str:
+        return "base"
+
+    def files(self) -> list[File]:
+        return []
+
+    def dockerfile(self) -> str:
+        image_name = self.dependency()
+        if isinstance(image_name, Image):
+            image_name = image_name.image_full_name()
+
+        if self.config.need_clone:
+            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
+        else:
+            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
+
+        return f"""FROM {image_name}
+
+{self.global_env}
+
+WORKDIR /home/
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+RUN apt update && apt install -y pkg-config build-essential python3 libkrb5-dev
+
+{code}
+
+{self.clear_env}
+
+"""
+
+
 class prettierImageDefault(Image):
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
@@ -19,8 +71,8 @@ class prettierImageDefault(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> str:
-        return "node:18"
+    def dependency(self) -> Image | None:
+        return prettierImageBase(self.pr, self._config)
 
     def image_tag(self) -> str:
         return f"pr-{self.pr.number}"
@@ -66,8 +118,6 @@ exit 0
                 "prepare.sh",
                 """#!/bin/bash
 set -e
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
 cd /home/{pr.repo}
 git reset --hard
@@ -75,8 +125,6 @@ bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
 
-nvm install || true
-nvm use || true
 corepack enable || true
 yes | yarn -v || true
 yarn || true
@@ -87,14 +135,13 @@ yarn || true
                 "run.sh",
                 """#!/bin/bash
 set -e
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 cd /home/{pr.repo}
 
-nvm use || true
 corepack enable || true
 yarn || true
-yarn test
+find node_modules -name 'index.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
+find node_modules -name 'requireOrImportModule.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
+yarn test --forceExit --runInBand
 """.format(pr=self.pr),
             ),
             File(
@@ -102,15 +149,14 @@ yarn test
                 "test-run.sh",
                 """#!/bin/bash
 set -e
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 cd /home/{pr.repo}
 git apply --whitespace=nowarn /home/test.patch
 
-nvm use || true
 corepack enable || true
 yarn || true
-yarn test
+find node_modules -name 'index.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
+find node_modules -name 'requireOrImportModule.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
+yarn test --forceExit --runInBand
 
 """.format(pr=self.pr),
             ),
@@ -119,22 +165,23 @@ yarn test
                 "fix-run.sh",
                 """#!/bin/bash
 set -e
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 cd /home/{pr.repo}
 git apply --whitespace=nowarn /home/test.patch /home/fix.patch
 
-nvm use || true
 corepack enable || true
 yarn || true
-yarn test
+find node_modules -name 'index.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
+find node_modules -name 'requireOrImportModule.js' -path '*/jest-util/build/*' -exec sed -i "s/error.code === 'ERR_REQUIRE_ESM'/error.code === 'ERR_REQUIRE_ESM' || error.code === 'ERR_REQUIRE_ASYNC_MODULE'/g" {{}} \\;
+yarn test --forceExit --runInBand
 
 """.format(pr=self.pr),
             ),
         ]
 
     def dockerfile(self) -> str:
-        base_img = self.dependency()
+        image = self.dependency()
+        name = image.image_name()
+        tag = image.image_tag()
 
         copy_commands = ""
         for file in self.files():
@@ -173,37 +220,9 @@ yarn test
                 """
                 )
 
-        return f"""FROM {base_img}
+        return f"""FROM {name}:{tag}
 
 {self.global_env}
-
-WORKDIR /home/
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
-
-RUN apt update && apt install -y libxkbfile-dev pkg-config build-essential python3 libkrb5-dev libxss1 xvfb libgtk-3-0 libgbm1 \
-    fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-khmeros fonts-kacst fonts-freefont-ttf dbus dbus-x11
-
-RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-        && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-        && apt-get update \
-        && apt-get install -y google-chrome-stable --no-install-recommends \
-        && rm -rf /var/lib/apt/lists/*; \
-    fi
-
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
-    export NVM_DIR="$HOME/.nvm" && \
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-RUN git clone "${{REPO_URL}}" /home/{self.pr.repo}
-
-WORKDIR /home/{self.pr.repo}
-
-RUN git reset --hard
-RUN git checkout ${{BASE_COMMIT}}
-
-WORKDIR /home
 
 {proxy_setup}
 
@@ -264,7 +283,7 @@ class prettier(Instance):
         failed_res = [
             re.compile(r"FAIL:?\s+([^\(]+)"),
             re.compile(r"\s*[×✗]\s+(.*?)(?:\s*\(\d+(?:\.\d+)?\s*(?:ms|s)\))?\s*$"),
-            re.compile(r"\s*\d+\)\s+(.*?)(?:\s*\(\d+(?:\.\d+)?\s*(?:ms|s)\))?\s*$"),
+            re.compile(r"^\s*\d+\)\s+(.*?)(?:\s*\(\d+(?:\.\d+)?\s*(?:ms|s)\))?\s*$"),
         ]
 
         skipped_res = [

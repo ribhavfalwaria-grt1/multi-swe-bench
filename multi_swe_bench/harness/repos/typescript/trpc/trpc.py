@@ -321,6 +321,8 @@ pnpm turbo --filter tests test-ci
 
 @Instance.register("trpc", "trpc")
 class Trpc(Instance):
+    _PNPM_ENSURE = "[ -x node_modules/.bin/turbo ] || pnpm install || true"
+
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -336,32 +338,68 @@ class Trpc(Instance):
 
         return ImageDefault(self.pr, self._config)
 
+    def _test_cmd(self) -> str:
+        if self.pr.number <= 5560:
+            return "pnpm turbo --filter tests test-ci"
+        return "pnpm test-ci --reporter=verbose || pnpm test --reporter=verbose || true"
+
     def run(self, run_cmd: str = "") -> str:
         if run_cmd:
             return run_cmd
 
-        return "bash /home/run.sh"
+        return f"bash -c 'cd /home/{self.pr.repo}; {self._PNPM_ENSURE}; {self._test_cmd()}'"
 
     def test_patch_run(self, test_patch_run_cmd: str = "") -> str:
         if test_patch_run_cmd:
             return test_patch_run_cmd
 
-        return "bash /home/test-run.sh"
+        return f"bash -c 'cd /home/{self.pr.repo}; git apply --exclude pnpm-lock.yaml --whitespace=nowarn /home/test.patch; {self._PNPM_ENSURE}; {self._test_cmd()}'"
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
         if fix_patch_run_cmd:
             return fix_patch_run_cmd
 
-        return "bash /home/fix-run.sh"
+        return f"bash -c 'cd /home/{self.pr.repo}; git apply --exclude pnpm-lock.yaml --whitespace=nowarn /home/test.patch /home/fix.patch; {self._PNPM_ENSURE}; {self._test_cmd()}'"
 
     def parse_log(self, test_log: str) -> TestResult:
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
 
-        current_suite = None
-        re_pass_suite1 = re.compile(
-            r"@trpc\/tests:test-ci: \[0\]\s+\[32m✓\[39m\s+([^\s]+)"
+        # Strip ANSI escape codes for reliable matching
+        ansi_re = re.compile(r"\x1b\[[0-9;]*m")
+
+        # Vitest file-level result: ✓ |@trpc/tests| server/foo.test.ts (N tests)
+        # Also matches: ✓ @trpc/tests server/foo.test.ts
+        re_pass = re.compile(r"[✓]\s+(?:\|?@trpc/\w+\|?)\s+(\S+\.(?:test|spec)\.tsx?)")
+        re_fail = re.compile(
+            r"[❯×✗]\s+(?:\|?@trpc/\w+\|?)\s+(\S+\.(?:test|spec)\.tsx?)"
+        )
+
+        for line in test_log.splitlines():
+            clean = ansi_re.sub("", line).strip()
+            if not clean:
+                continue
+
+            # Strip leading [0] or [1] from turbo output
+            clean = re.sub(r"^\[\d+\]\s*", "", clean)
+
+            pass_match = re_pass.search(clean)
+            if pass_match:
+                passed_tests.add(pass_match.group(1))
+                continue
+
+            fail_match = re_fail.search(clean)
+            if fail_match:
+                failed_tests.add(fail_match.group(1))
+
+        return TestResult(
+            passed_count=len(passed_tests),
+            failed_count=len(failed_tests),
+            skipped_count=len(skipped_tests),
+            passed_tests=passed_tests,
+            failed_tests=failed_tests,
+            skipped_tests=skipped_tests,
         )
         re_pass_suite2 = re.compile(
             r"\[0\]\s+\[32m✓\[39m\s+\[32m\|tests\|\[39m\s+([^\s]+)"

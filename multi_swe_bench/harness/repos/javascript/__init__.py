@@ -73,6 +73,8 @@ from multi_swe_bench.harness.repos.javascript.IgniteUI import *
 from multi_swe_bench.harness.repos.javascript.CVEProject import *
 from multi_swe_bench.harness.repos.javascript.Agoric import *
 from multi_swe_bench.harness.repos.javascript.City_of_Helsinki import *
+from multi_swe_bench.harness.repos.javascript.TryGhost import *
+from multi_swe_bench.harness.repos.javascript.rollup import *
 from multi_swe_bench.harness.repos.javascript.cuttle_cards import *
 from multi_swe_bench.harness.repos.javascript.dinerojs import *
 from multi_swe_bench.harness.repos.javascript.vercel.next_js import *
@@ -81,4 +83,5 @@ from multi_swe_bench.harness.repos.javascript.alam00000 import *
 from multi_swe_bench.harness.repos.javascript.exercism import *
 from multi_swe_bench.harness.repos.javascript.jsx_eslint import *
 from multi_swe_bench.harness.repos.javascript.markedjs import *
-
+from multi_swe_bench.harness.repos.javascript.acornjs import *
+from multi_swe_bench.harness.repos.javascript.videojs import *

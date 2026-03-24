@@ -220,13 +220,31 @@ class Php(Instance):
         if test_patch_run_cmd:
             return test_patch_run_cmd
 
-        return "bash /home/test-run.sh"
+        return (
+            "bash -c '"
+            "cd /home/php-src && "
+            "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
+            "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
+            "./buildconf && ./configure --enable-debug && make -j4 && "
+            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "'"
+        )
 
     def fix_patch_run(self, fix_patch_run_cmd: str = "") -> str:
         if fix_patch_run_cmd:
             return fix_patch_run_cmd
 
-        return "bash /home/fix-run.sh"
+        return (
+            "bash -c '"
+            "cd /home/php-src && "
+            "(git apply --whitespace=nowarn /home/test.patch 2>/dev/null || "
+            "git apply --3way --whitespace=nowarn /home/test.patch 2>/dev/null || true) && "
+            "(git apply --whitespace=nowarn /home/fix.patch 2>/dev/null || "
+            "git apply --3way --whitespace=nowarn /home/fix.patch 2>/dev/null || true) && "
+            "./buildconf && ./configure --enable-debug && make -j4 && "
+            "make TEST_PHP_ARGS=-j4 NO_INTERACTION=1 test"
+            "'"
+        )
 
     def parse_log(self, test_log: str) -> TestResult:
         passed_tests = set()
