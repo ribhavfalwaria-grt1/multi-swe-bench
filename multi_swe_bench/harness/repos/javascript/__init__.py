@@ -85,3 +85,4 @@ from multi_swe_bench.harness.repos.javascript.jsx_eslint import *
 from multi_swe_bench.harness.repos.javascript.markedjs import *
 from multi_swe_bench.harness.repos.javascript.acornjs import *
 from multi_swe_bench.harness.repos.javascript.videojs import *
+from multi_swe_bench.harness.repos.javascript.hapijs import *
