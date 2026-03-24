@@ -124,3 +124,4 @@ from multi_swe_bench.harness.repos.typescript.urql_graphql import *
 from multi_swe_bench.harness.repos.typescript.blitz_js import *
 from multi_swe_bench.harness.repos.typescript.drizzle_team import *
 from multi_swe_bench.harness.repos.typescript.xtermjs import *
+from multi_swe_bench.harness.repos.typescript.babel import *
