@@ -1,5 +1,6 @@
 from multi_swe_bench.harness.repos.golang.beego import *
 from multi_swe_bench.harness.repos.golang.caddyserver import *
+from multi_swe_bench.harness.repos.golang.evanw import *
 from multi_swe_bench.harness.repos.golang.cli import *
 from multi_swe_bench.harness.repos.golang.etcd_io import *
 from multi_swe_bench.harness.repos.golang.fatedier import *
