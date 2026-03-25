@@ -21,7 +21,7 @@ class ImageDefault(Image):
         return self._config
 
     def dependency(self) -> str:
-        return "python:3.11-slim"
+        return "python:3.10-slim"
 
     def image_prefix(self) -> str:
         return "envagent"
@@ -50,41 +50,35 @@ class ImageDefault(Image):
                 "prepare.sh",
                 """ls -la
 ###ACTION_DELIMITER###
-uv sync
+apt-get update && apt-get install -y build-essential python3-dev libyaml-dev
 ###ACTION_DELIMITER###
-pip install uv
+pip install pdm
 ###ACTION_DELIMITER###
-uv sync
+pdm config python.use_venv false
 ###ACTION_DELIMITER###
-apt-get update && apt-get install -y build-essential
+pdm lock --update-reuse || true
 ###ACTION_DELIMITER###
-uv sync
+pdm install --dev -G:all --frozen-lockfile || pdm install --dev -G:all --no-lock || true
 ###ACTION_DELIMITER###
-uv sync
+pip install -e . --no-deps || true
 ###ACTION_DELIMITER###
-cat << EOF > test_commands.sh
-#!/bin/bash
-uv run pytest tests -v -rA --tb=no -p no:cacheprovider
-uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider
-EOF
+cp -r /usr/local/lib/python3.10/site-packages/litestar*.dist-info /home/litestar/__pypackages__/3.10/lib/ 2>/dev/null || true
 ###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh && echo 'uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh
-###ACTION_DELIMITER###
-cat test_commands.sh
+echo '#!/bin/bash' > test_commands.sh && echo 'pdm run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh
 ###ACTION_DELIMITER###
 chmod +x test_commands.sh
 ###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto' >> test_commands.sh
+cat test_commands.sh
 ###ACTION_DELIMITER###
-chmod +x test_commands.sh""",
+bash test_commands.sh""",
             ),
             File(
                 ".",
                 "run.sh",
                 """#!/bin/bash
+set -eo pipefail
 cd /home/[[REPO_NAME]]
-#!/bin/bash
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+pdm run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -107,7 +101,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+pdm run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -130,7 +124,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+pdm run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -147,7 +141,7 @@ uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
 
 # Choose an appropriate base image based on the project's requirements - replace python:3.11-slim with actual base image
 # For example: FROM ubuntu:**, FROM python:**, FROM node:**, FROM centos:**, etc.
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 ## Set noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
@@ -169,6 +163,16 @@ RUN git clone https://github.com/litestar-org/litestar.git /home/litestar
 WORKDIR /home/litestar
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+# Install dependencies
+RUN apt-get update && apt-get install -y build-essential python3-dev libyaml-dev
+RUN pip install pdm
+ENV PDM_CHECK_UPDATE=false
+RUN pdm config python.use_venv false
+RUN pdm lock --update-reuse || true
+RUN pdm install --dev -G:all --frozen-lockfile || pdm install --dev -G:all --no-lock || true
+RUN pip install -e . --no-deps || true
+RUN cp -r /usr/local/lib/python3.10/site-packages/litestar*.dist-info /home/litestar/__pypackages__/3.10/lib/ 2>/dev/null || true
 """
         dockerfile_content += f"""
 {copy_commands}
@@ -176,8 +180,8 @@ RUN git checkout {pr.base.sha}
         return dockerfile_content.format(pr=self.pr)
 
 
-@Instance.register("litestar-org", "litestar_4099_to_3939")
-class LITESTAR_4099_TO_3939(Instance):
+@Instance.register("litestar-org", "litestar_3169_to_2363")
+class LITESTAR_3169_TO_2363(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -208,13 +212,12 @@ class LITESTAR_4099_TO_3939(Instance):
 
         return "bash /home/fix-run.sh"
 
-    def parse_log(self, log: str) -> TestResult:
+    def parse_log(self, test_log: str) -> TestResult:
         # Parse the log content and extract test execution results.
+        test_log = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", test_log)
         passed_tests = set[str]()  # Tests that passed successfully
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
-        import re
-        import json
 
         # Regex pattern to match test cases with their statuses
         # Captures status (PASSED, FAILED, etc.) and test name, ignoring trailing error messages
@@ -223,7 +226,7 @@ class LITESTAR_4099_TO_3939(Instance):
             re.IGNORECASE,  # Case-insensitive to handle any case variations
         )
         # Find all matches in the log content
-        matches = pattern.findall(log)
+        matches = pattern.findall(test_log)
         for status, test_name in matches:
             status = status.upper()
             test_name = test_name.strip()  # Remove any leading/trailing whitespace
@@ -233,6 +236,7 @@ class LITESTAR_4099_TO_3939(Instance):
                 failed_tests.add(test_name)
             elif status == "SKIPPED":
                 skipped_tests.add(test_name)
+        passed_tests -= failed_tests
         parsed_results = {
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,

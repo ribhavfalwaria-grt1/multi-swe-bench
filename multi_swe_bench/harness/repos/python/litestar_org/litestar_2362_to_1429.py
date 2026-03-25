@@ -21,7 +21,7 @@ class ImageDefault(Image):
         return self._config
 
     def dependency(self) -> str:
-        return "python:3.11-slim"
+        return "python:3.10-slim"
 
     def image_prefix(self) -> str:
         return "envagent"
@@ -48,43 +48,25 @@ class ImageDefault(Image):
             File(
                 ".",
                 "prepare.sh",
-                """ls -la
+                """apt-get update && apt-get install -y build-essential
 ###ACTION_DELIMITER###
-uv sync
+pip install poetry
 ###ACTION_DELIMITER###
-pip install uv
+poetry lock || true
 ###ACTION_DELIMITER###
-uv sync
+poetry install --with dev
 ###ACTION_DELIMITER###
-apt-get update && apt-get install -y build-essential
+echo 'poetry run pytest -v tests docs/examples' > /home/litestar/test_commands.sh
 ###ACTION_DELIMITER###
-uv sync
-###ACTION_DELIMITER###
-uv sync
-###ACTION_DELIMITER###
-cat << EOF > test_commands.sh
-#!/bin/bash
-uv run pytest tests -v -rA --tb=no -p no:cacheprovider
-uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider
-EOF
-###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh && echo 'uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh
-###ACTION_DELIMITER###
-cat test_commands.sh
-###ACTION_DELIMITER###
-chmod +x test_commands.sh
-###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto' >> test_commands.sh
-###ACTION_DELIMITER###
-chmod +x test_commands.sh""",
+cat /home/litestar/test_commands.sh""",
             ),
             File(
                 ".",
                 "run.sh",
                 """#!/bin/bash
+set -eo pipefail
 cd /home/[[REPO_NAME]]
-#!/bin/bash
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v tests docs/examples
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -107,7 +89,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v tests docs/examples
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -130,7 +112,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v tests docs/examples
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -147,7 +129,7 @@ uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
 
 # Choose an appropriate base image based on the project's requirements - replace python:3.11-slim with actual base image
 # For example: FROM ubuntu:**, FROM python:**, FROM node:**, FROM centos:**, etc.
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 ## Set noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
@@ -156,7 +138,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # For example: RUN apt-get update && apt-get install -y git
 # For example: RUN yum install -y git
 # For example: RUN apk add --no-cache git
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git build-essential
 
 # Ensure bash is available
 RUN if [ ! -f /bin/bash ]; then         if command -v apk >/dev/null 2>&1; then             apk add --no-cache bash;         elif command -v apt-get >/dev/null 2>&1; then             apt-get update && apt-get install -y bash;         elif command -v yum >/dev/null 2>&1; then             yum install -y bash;         else             exit 1;         fi     fi
@@ -169,6 +151,11 @@ RUN git clone https://github.com/litestar-org/litestar.git /home/litestar
 WORKDIR /home/litestar
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+# Install dependencies
+RUN pip install poetry
+RUN poetry lock || true
+RUN poetry install --with dev
 """
         dockerfile_content += f"""
 {copy_commands}
@@ -176,8 +163,8 @@ RUN git checkout {pr.base.sha}
         return dockerfile_content.format(pr=self.pr)
 
 
-@Instance.register("litestar-org", "litestar_4099_to_3939")
-class LITESTAR_4099_TO_3939(Instance):
+@Instance.register("litestar-org", "litestar_2362_to_1429")
+class LITESTAR_2362_TO_1429(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -210,29 +197,40 @@ class LITESTAR_4099_TO_3939(Instance):
 
     def parse_log(self, log: str) -> TestResult:
         # Parse the log content and extract test execution results.
-        passed_tests = set[str]()  # Tests that passed successfully
-        failed_tests = set[str]()  # Tests that failed
-        skipped_tests = set[str]()  # Tests that were skipped
-        import re
-        import json
+        log = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", log)
+        passed_tests = set()  # Tests that passed successfully
+        failed_tests = set()  # Tests that failed
+        skipped_tests = set()  # Tests that were skipped
 
-        # Regex pattern to match test cases with their statuses
-        # Captures status (PASSED, FAILED, etc.) and test name, ignoring trailing error messages
-        pattern = re.compile(
-            r".*?\b(PASSED|FAILED|SKIPPED|ERROR|XFAILED|XPASSED|RERUN)\b.*?(tests/[\w/:\.\[\]@,-]+)",
-            re.IGNORECASE,  # Case-insensitive to handle any case variations
+        # Implement the log parsing logic here
+        # Regex patterns for test lines
+        pattern1 = re.compile(
+            r"^(.+?)\s+(PASSED|FAILED|SKIPPED|ERROR)\s+\[\s*\d+%\s*\]$"
         )
-        # Find all matches in the log content
-        matches = pattern.findall(log)
-        for status, test_name in matches:
-            status = status.upper()
-            test_name = test_name.strip()  # Remove any leading/trailing whitespace
-            if status in {"PASSED", "XPASSED"}:
+        pattern2 = re.compile(r"^(PASSED|FAILED|SKIPPED|ERROR)\s+(.+)$")
+        for line in log.split("\n"):
+            line = line.strip()
+            match = pattern1.match(line)
+            if match:
+                test_name = match.group(1).strip()
+                status = match.group(2)
+            else:
+                match = pattern2.match(line)
+                if match:
+                    status = match.group(1)
+                    test_name = match.group(2).strip()
+                else:
+                    continue
+            if status == "PASSED":
                 passed_tests.add(test_name)
-            elif status in {"FAILED", "ERROR", "XFAILED", "RERUN"}:
+            elif status == "FAILED":
                 failed_tests.add(test_name)
             elif status == "SKIPPED":
                 skipped_tests.add(test_name)
+            elif status == "ERROR":
+                failed_tests.add(test_name)  # Assume ERROR is a type of failure
+            # else: ignore unknown status
+        passed_tests -= failed_tests
         parsed_results = {
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,

@@ -50,17 +50,17 @@ class ImageDefault(Image):
                 "prepare.sh",
                 """ls -la
 ###ACTION_DELIMITER###
-uv sync
+uv sync || true
 ###ACTION_DELIMITER###
-pip install uv
+pip install uv || true
 ###ACTION_DELIMITER###
-uv sync
+uv sync || true
 ###ACTION_DELIMITER###
-apt-get update && apt-get install -y build-essential
+apt-get update && apt-get install -y build-essential || true
 ###ACTION_DELIMITER###
-uv sync
+uv sync || true
 ###ACTION_DELIMITER###
-uv sync
+uv sync || true
 ###ACTION_DELIMITER###
 cat << EOF > test_commands.sh
 #!/bin/bash
@@ -82,8 +82,8 @@ chmod +x test_commands.sh""",
                 ".",
                 "run.sh",
                 """#!/bin/bash
+set -eo pipefail
 cd /home/[[REPO_NAME]]
-#!/bin/bash
 uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
 
 """.replace("[[REPO_NAME]]", repo_name),
@@ -169,6 +169,11 @@ RUN git clone https://github.com/litestar-org/litestar.git /home/litestar
 WORKDIR /home/litestar
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+# Install dependencies
+RUN pip install uv || true
+RUN apt-get update && apt-get install -y build-essential || true
+RUN uv sync || true
 """
         dockerfile_content += f"""
 {copy_commands}
@@ -176,8 +181,8 @@ RUN git checkout {pr.base.sha}
         return dockerfile_content.format(pr=self.pr)
 
 
-@Instance.register("litestar-org", "litestar_4099_to_3939")
-class LITESTAR_4099_TO_3939(Instance):
+@Instance.register("litestar-org", "litestar_4343_to_4100")
+class LITESTAR_4343_TO_4100(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -210,11 +215,10 @@ class LITESTAR_4099_TO_3939(Instance):
 
     def parse_log(self, log: str) -> TestResult:
         # Parse the log content and extract test execution results.
+        log = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", log)
         passed_tests = set[str]()  # Tests that passed successfully
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
-        import re
-        import json
 
         # Regex pattern to match test cases with their statuses
         # Captures status (PASSED, FAILED, etc.) and test name, ignoring trailing error messages
@@ -233,6 +237,8 @@ class LITESTAR_4099_TO_3939(Instance):
                 failed_tests.add(test_name)
             elif status == "SKIPPED":
                 skipped_tests.add(test_name)
+        # Remove failed tests from the set of passed tests if any overlap
+        passed_tests -= failed_tests
         parsed_results = {
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,

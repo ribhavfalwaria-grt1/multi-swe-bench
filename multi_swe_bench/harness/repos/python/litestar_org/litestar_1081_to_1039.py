@@ -21,7 +21,7 @@ class ImageDefault(Image):
         return self._config
 
     def dependency(self) -> str:
-        return "python:3.11-slim"
+        return "python:3.10-slim"
 
     def image_prefix(self) -> str:
         return "envagent"
@@ -50,31 +50,16 @@ class ImageDefault(Image):
                 "prepare.sh",
                 """ls -la
 ###ACTION_DELIMITER###
-uv sync
+pip install poetry
 ###ACTION_DELIMITER###
-pip install uv
+poetry lock || true
 ###ACTION_DELIMITER###
-uv sync
+poetry install --with dev
 ###ACTION_DELIMITER###
-apt-get update && apt-get install -y build-essential
+echo 'poetry run pytest -v' > test_commands.sh
 ###ACTION_DELIMITER###
-uv sync
-###ACTION_DELIMITER###
-uv sync
-###ACTION_DELIMITER###
-cat << EOF > test_commands.sh
-#!/bin/bash
-uv run pytest tests -v -rA --tb=no -p no:cacheprovider
-uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider
-EOF
-###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh && echo 'uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh
-###ACTION_DELIMITER###
-cat test_commands.sh
-###ACTION_DELIMITER###
-chmod +x test_commands.sh
-###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto' >> test_commands.sh
+echo -e '#!/bin/bash
+poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider' > test_commands.sh
 ###ACTION_DELIMITER###
 chmod +x test_commands.sh""",
             ),
@@ -82,9 +67,9 @@ chmod +x test_commands.sh""",
                 ".",
                 "run.sh",
                 """#!/bin/bash
+set -eo pipefail
 cd /home/[[REPO_NAME]]
-#!/bin/bash
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -107,7 +92,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -130,7 +115,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -145,9 +130,9 @@ uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
 # This is a template for creating a Dockerfile to test patches
 # LLM should fill in the appropriate values based on the context
 
-# Choose an appropriate base image based on the project's requirements - replace python:3.11-slim with actual base image
+# Choose an appropriate base image based on the project's requirements - replace [base image] with actual base image
 # For example: FROM ubuntu:**, FROM python:**, FROM node:**, FROM centos:**, etc.
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 ## Set noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
@@ -156,7 +141,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # For example: RUN apt-get update && apt-get install -y git
 # For example: RUN yum install -y git
 # For example: RUN apk add --no-cache git
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git build-essential cmake
 
 # Ensure bash is available
 RUN if [ ! -f /bin/bash ]; then         if command -v apk >/dev/null 2>&1; then             apk add --no-cache bash;         elif command -v apt-get >/dev/null 2>&1; then             apt-get update && apt-get install -y bash;         elif command -v yum >/dev/null 2>&1; then             yum install -y bash;         else             exit 1;         fi     fi
@@ -169,6 +154,11 @@ RUN git clone https://github.com/litestar-org/litestar.git /home/litestar
 WORKDIR /home/litestar
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+# Install dependencies
+RUN pip install poetry
+RUN poetry lock || true
+RUN poetry install --with dev
 """
         dockerfile_content += f"""
 {copy_commands}
@@ -176,8 +166,8 @@ RUN git checkout {pr.base.sha}
         return dockerfile_content.format(pr=self.pr)
 
 
-@Instance.register("litestar-org", "litestar_4099_to_3939")
-class LITESTAR_4099_TO_3939(Instance):
+@Instance.register("litestar-org", "litestar_1081_to_1039")
+class LITESTAR_1081_TO_1039(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -208,31 +198,58 @@ class LITESTAR_4099_TO_3939(Instance):
 
         return "bash /home/fix-run.sh"
 
-    def parse_log(self, log: str) -> TestResult:
+    def parse_log(self, test_log: str) -> TestResult:
+        log = test_log
         # Parse the log content and extract test execution results.
-        passed_tests = set[str]()  # Tests that passed successfully
-        failed_tests = set[str]()  # Tests that failed
-        skipped_tests = set[str]()  # Tests that were skipped
-        import re
-        import json
+        log = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", log)
+        passed_tests = set()  # Tests that passed successfully
+        failed_tests = set()  # Tests that failed
+        skipped_tests = set()  # Tests that were skipped
 
-        # Regex pattern to match test cases with their statuses
-        # Captures status (PASSED, FAILED, etc.) and test name, ignoring trailing error messages
-        pattern = re.compile(
-            r".*?\b(PASSED|FAILED|SKIPPED|ERROR|XFAILED|XPASSED|RERUN)\b.*?(tests/[\w/:\.\[\]@,-]+)",
-            re.IGNORECASE,  # Case-insensitive to handle any case variations
+        # Regex patterns to match test cases and their statuses (captures full test names)
+        # Pattern 1: Test name followed by status (e.g., "tests/...py::... PASSED [  0%]")
+        pattern_test_first = re.compile(
+            r"(tests/.*?\.py::[^\s]+)\s+(PASSED|FAILED|SKIPPED|XFAIL|ERROR).*"
         )
-        # Find all matches in the log content
-        matches = pattern.findall(log)
-        for status, test_name in matches:
-            status = status.upper()
-            test_name = test_name.strip()  # Remove any leading/trailing whitespace
-            if status in {"PASSED", "XPASSED"}:
-                passed_tests.add(test_name)
-            elif status in {"FAILED", "ERROR", "XFAILED", "RERUN"}:
-                failed_tests.add(test_name)
-            elif status == "SKIPPED":
-                skipped_tests.add(test_name)
+        # Pattern 2: Status followed by test name (e.g., "PASSED tests/...py::...")
+        pattern_status_first = re.compile(
+            r"(PASSED|FAILED|SKIPPED|XFAIL|ERROR).*?\s+(tests/.*?\.py::[^\s]+).*"
+        )
+        # Pattern 3: Collection errors (e.g., "ERROR tests/...py - ...")
+        pattern_collection_error = re.compile(
+            r"ERROR\s+(tests/.*?\.py)(?:\s+-\s+.*)?$"
+        )
+        # Split the log into lines
+        lines = log.split("\n")
+        for line in lines:
+            line = line.strip()
+            # Check for test name first pattern
+            for match in pattern_test_first.findall(line):
+                test_name, status = match
+                if test_name.startswith("tests/"):
+                    if status == "PASSED":
+                        passed_tests.add(test_name)
+                    elif status in ("FAILED", "ERROR"):
+                        failed_tests.add(test_name)
+                    elif status == "SKIPPED":
+                        skipped_tests.add(test_name)
+            # Check for status first pattern
+            for match in pattern_status_first.findall(line):
+                status, test_name = match
+                if test_name.startswith("tests/"):
+                    if status == "PASSED":
+                        passed_tests.add(test_name)
+                    elif status in ("FAILED", "ERROR"):
+                        failed_tests.add(test_name)
+                    elif status == "SKIPPED":
+                        skipped_tests.add(test_name)
+            # Check for collection errors (ERROR tests/foo.py - SomeError)
+            match = pattern_collection_error.match(line)
+            if match:
+                test_name = match.group(1)
+                if test_name.startswith("tests/"):
+                    failed_tests.add(test_name)
+        passed_tests -= failed_tests
         parsed_results = {
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,

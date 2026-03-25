@@ -21,7 +21,7 @@ class ImageDefault(Image):
         return self._config
 
     def dependency(self) -> str:
-        return "python:3.11-slim"
+        return "python:3.9-slim"
 
     def image_prefix(self) -> str:
         return "envagent"
@@ -48,43 +48,33 @@ class ImageDefault(Image):
             File(
                 ".",
                 "prepare.sh",
-                """ls -la
+                """ls
 ###ACTION_DELIMITER###
-uv sync
+ls tests
 ###ACTION_DELIMITER###
-pip install uv
-###ACTION_DELIMITER###
-uv sync
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y build-essential
-###ACTION_DELIMITER###
-uv sync
-###ACTION_DELIMITER###
-uv sync
-###ACTION_DELIMITER###
-cat << EOF > test_commands.sh
-#!/bin/bash
-uv run pytest tests -v -rA --tb=no -p no:cacheprovider
-uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider
-EOF
-###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh && echo 'uv run pytest docs/examples -v -rA --tb=no -p no:cacheprovider' >> test_commands.sh
+echo 'poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider tests/' > test_commands.sh
 ###ACTION_DELIMITER###
 cat test_commands.sh
 ###ACTION_DELIMITER###
-chmod +x test_commands.sh
+apt-get update
 ###ACTION_DELIMITER###
-echo '#!/bin/bash' > test_commands.sh && echo 'uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto' >> test_commands.sh
+apt-get install -y build-essential python3-dev
 ###ACTION_DELIMITER###
-chmod +x test_commands.sh""",
+pip install poetry
+###ACTION_DELIMITER###
+poetry lock || true
+###ACTION_DELIMITER###
+poetry install --with dev
+###ACTION_DELIMITER###
+bash test_commands.sh""",
             ),
             File(
                 ".",
                 "run.sh",
                 """#!/bin/bash
+set -eo pipefail
 cd /home/[[REPO_NAME]]
-#!/bin/bash
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider tests/
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -107,7 +97,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider tests/
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -130,7 +120,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn --exclude='*.lock' /ho
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
+poetry run pytest -v --no-header -rA --tb=no -p no:cacheprovider tests/
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -145,9 +135,9 @@ uv run pytest tests docs/examples -v -rA --tb=no -p no:cacheprovider -n auto
 # This is a template for creating a Dockerfile to test patches
 # LLM should fill in the appropriate values based on the context
 
-# Choose an appropriate base image based on the project's requirements - replace python:3.11-slim with actual base image
+# Choose an appropriate base image based on the project's requirements - replace python:3.9-slim with actual base image
 # For example: FROM ubuntu:**, FROM python:**, FROM node:**, FROM centos:**, etc.
-FROM python:3.11-slim
+FROM python:3.9-slim
 
 ## Set noninteractive
 ENV DEBIAN_FRONTEND=noninteractive
@@ -169,6 +159,12 @@ RUN git clone https://github.com/litestar-org/litestar.git /home/litestar
 WORKDIR /home/litestar
 RUN git reset --hard
 RUN git checkout {pr.base.sha}
+
+# Install dependencies
+RUN apt-get update && apt-get install -y build-essential python3-dev
+RUN pip install poetry
+RUN poetry lock || true
+RUN poetry install --with dev
 """
         dockerfile_content += f"""
 {copy_commands}
@@ -176,8 +172,8 @@ RUN git checkout {pr.base.sha}
         return dockerfile_content.format(pr=self.pr)
 
 
-@Instance.register("litestar-org", "litestar_4099_to_3939")
-class LITESTAR_4099_TO_3939(Instance):
+@Instance.register("litestar-org", "litestar_569_to_16")
+class LITESTAR_569_TO_16(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):
         super().__init__()
         self._pr = pr
@@ -210,29 +206,41 @@ class LITESTAR_4099_TO_3939(Instance):
 
     def parse_log(self, log: str) -> TestResult:
         # Parse the log content and extract test execution results.
-        passed_tests = set[str]()  # Tests that passed successfully
-        failed_tests = set[str]()  # Tests that failed
-        skipped_tests = set[str]()  # Tests that were skipped
-        import re
-        import json
+        log = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", log)
+        passed_tests: set[str] = set()  # Tests that passed successfully
+        failed_tests: set[str] = set()  # Tests that failed
+        skipped_tests: set[str] = set()  # Tests that were skipped
 
-        # Regex pattern to match test cases with their statuses
-        # Captures status (PASSED, FAILED, etc.) and test name, ignoring trailing error messages
-        pattern = re.compile(
-            r".*?\b(PASSED|FAILED|SKIPPED|ERROR|XFAILED|XPASSED|RERUN)\b.*?(tests/[\w/:\.\[\]@,-]+)",
-            re.IGNORECASE,  # Case-insensitive to handle any case variations
+        # Pattern for passed tests: either "tests/... PASSED" or "PASSED tests/..."
+        passed_pattern = re.compile(
+            r"(tests/[^\s]+)\s+PASSED|PASSED\s+(tests/[^\s]+)", re.MULTILINE
         )
-        # Find all matches in the log content
-        matches = pattern.findall(log)
-        for status, test_name in matches:
-            status = status.upper()
-            test_name = test_name.strip()  # Remove any leading/trailing whitespace
-            if status in {"PASSED", "XPASSED"}:
-                passed_tests.add(test_name)
-            elif status in {"FAILED", "ERROR", "XFAILED", "RERUN"}:
-                failed_tests.add(test_name)
-            elif status == "SKIPPED":
-                skipped_tests.add(test_name)
+        # Pattern for failed tests: "FAILED tests/..."
+        failed_pattern = re.compile(r"FAILED\s+(tests/[^\s]+)", re.MULTILINE)
+        # Pattern for collection/runtime errors: "ERROR tests/..."
+        error_pattern = re.compile(r"ERROR\s+(tests/[^\s]+)", re.MULTILINE)
+        # Pattern for skipped tests: "SKIPPED [n] tests/...:"
+        skipped_pattern = re.compile(r"SKIPPED.*?(tests/[^:]+:\d+):", re.MULTILINE)
+        # Extract passed tests
+        for match in passed_pattern.finditer(log):
+            test_name = match.group(1) or match.group(2)
+            if test_name:
+                passed_tests.add(test_name.strip())
+        # Extract failed tests
+        for match in failed_pattern.finditer(log):
+            test_name = match.group(1)
+            if test_name:
+                failed_tests.add(test_name.strip())
+        for match in error_pattern.finditer(log):
+            test_name = match.group(1)
+            if test_name:
+                failed_tests.add(test_name.strip())
+        # Extract skipped tests
+        for match in skipped_pattern.finditer(log):
+            test_name = match.group(1)
+            if test_name:
+                skipped_tests.add(test_name.strip())
+        passed_tests -= failed_tests
         parsed_results = {
             "passed_tests": passed_tests,
             "failed_tests": failed_tests,
