@@ -48,3 +48,4 @@ from multi_swe_bench.harness.repos.golang.tektoncd import *
 from multi_swe_bench.harness.repos.golang.prometheus_operator import *
 from multi_swe_bench.harness.repos.golang.mattermost import *
 from multi_swe_bench.harness.repos.golang.spf13 import *
+from multi_swe_bench.harness.repos.golang.open_telemetry import *
