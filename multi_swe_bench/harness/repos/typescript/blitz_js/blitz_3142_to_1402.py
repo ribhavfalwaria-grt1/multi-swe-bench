@@ -6,6 +6,61 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
+class BlitzImageBase(Image):
+
+    def __init__(self, pr: PullRequest, config: Config):
+        self._pr = pr
+        self._config = config
+
+    @property
+    def pr(self) -> PullRequest:
+        return self._pr
+
+    @property
+    def config(self) -> Config:
+        return self._config
+
+    def dependency(self) -> Union[str, "Image"]:
+        return "node:14-bullseye"
+
+    def image_tag(self) -> str:
+        return "base"
+
+    def workdir(self) -> str:
+        return "base"
+
+    def files(self) -> list[File]:
+        return []
+
+    def dockerfile(self) -> str:
+        image_name = self.dependency()
+        if isinstance(image_name, Image):
+            image_name = image_name.image_full_name()
+
+        if self.config.need_clone:
+            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
+        else:
+            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
+
+        return f"""FROM {image_name}
+
+{self.global_env}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y git build-essential python3
+
+WORKDIR /home/
+
+{code}
+
+WORKDIR /home/{self.pr.repo}
+
+{self.clear_env}
+
+"""
+
+
 class ImageDefault(Image):
     """Era 1: blitz-js/blitz PRs 1402-3142 (releases 0.28-0.45, base_ref=canary).
     Toolchain: Yarn workspaces, Jest, Node 14, ultra-runner.
@@ -23,8 +78,8 @@ class ImageDefault(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> str:
-        return "node:14-bullseye"
+    def dependency(self) -> Union[str, "Image"]:
+        return BlitzImageBase(self.pr, self._config)
 
     def image_prefix(self) -> str:
         return "mswebench"
@@ -126,32 +181,31 @@ npx ultra -r test 2>&1
         ]
 
     def dockerfile(self) -> str:
+        image = self.dependency()
+        name = image.image_name()
+        tag = image.image_tag()
+
         copy_commands = ""
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
-        dockerfile_content = """FROM node:14-bullseye
+        return f"""FROM {name}:{tag}
 
-ENV DEBIAN_FRONTEND=noninteractive
+{self.global_env}
 
-RUN apt-get update && apt-get install -y git build-essential python3
-
-WORKDIR /home/
-COPY fix.patch /home/
-COPY test.patch /home/
-RUN git clone https://github.com/{pr.org}/{pr.repo}.git /home/{pr.repo}
-
-WORKDIR /home/{pr.repo}
+WORKDIR /home/{self.pr.repo}
 RUN git reset --hard
-RUN git checkout {pr.base.sha}
+RUN git checkout {self.pr.base.sha}
 
 RUN npm install -g ultra-runner
 
 RUN yarn install --frozen-lockfile || yarn install || true
 
 {copy_commands}
+
+{self.clear_env}
+
 """
-        return dockerfile_content.format(pr=self.pr, copy_commands=copy_commands)
 
 
 @Instance.register("blitz-js", "blitz_3142_to_1402")

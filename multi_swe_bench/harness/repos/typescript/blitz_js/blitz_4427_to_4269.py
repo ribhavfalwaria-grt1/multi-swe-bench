@@ -6,6 +6,62 @@ from multi_swe_bench.harness.instance import Instance, TestResult
 from multi_swe_bench.harness.pull_request import PullRequest
 
 
+class BlitzImageBaseV2(Image):
+
+    def __init__(self, pr: PullRequest, config: Config):
+        self._pr = pr
+        self._config = config
+
+    @property
+    def pr(self) -> PullRequest:
+        return self._pr
+
+    @property
+    def config(self) -> Config:
+        return self._config
+
+    def dependency(self) -> Union[str, "Image"]:
+        return "node:18"
+
+    def image_tag(self) -> str:
+        return "base-v2"
+
+    def workdir(self) -> str:
+        return "base-v2"
+
+    def files(self) -> list[File]:
+        return []
+
+    def dockerfile(self) -> str:
+        image_name = self.dependency()
+        if isinstance(image_name, Image):
+            image_name = image_name.image_full_name()
+
+        if self.config.need_clone:
+            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
+        else:
+            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
+
+        return f"""FROM {image_name}
+
+{self.global_env}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y git build-essential python3
+RUN echo 'fs.inotify.max_user_watches=524288' >> /etc/sysctl.conf || true
+
+WORKDIR /home/
+
+{code}
+
+WORKDIR /home/{self.pr.repo}
+
+{self.clear_env}
+
+"""
+
+
 class ImageDefault(Image):
     """Era 2: blitz-js/blitz PRs 4269-4427 (releases 2.0-3.0, base_ref=main).
     Toolchain: pnpm@8.6.6 workspaces, Vitest, Turbo, Node 18.
@@ -23,8 +79,8 @@ class ImageDefault(Image):
     def config(self) -> Config:
         return self._config
 
-    def dependency(self) -> str:
-        return "node:18"
+    def dependency(self) -> Union[str, "Image"]:
+        return BlitzImageBaseV2(self.pr, self._config)
 
     def image_prefix(self) -> str:
         return "mswebench"
@@ -123,25 +179,21 @@ pnpm turbo run test 2>&1
         ]
 
     def dockerfile(self) -> str:
+        image = self.dependency()
+        name = image.image_name()
+        tag = image.image_tag()
+
         copy_commands = ""
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
-        dockerfile_content = """FROM node:18
+        return f"""FROM {name}:{tag}
 
-ENV DEBIAN_FRONTEND=noninteractive
+{self.global_env}
 
-RUN apt-get update && apt-get install -y git build-essential python3
-RUN echo 'fs.inotify.max_user_watches=524288' >> /etc/sysctl.conf || true
-
-WORKDIR /home/
-COPY fix.patch /home/
-COPY test.patch /home/
-RUN git clone https://github.com/{pr.org}/{pr.repo}.git /home/{pr.repo}
-
-WORKDIR /home/{pr.repo}
+WORKDIR /home/{self.pr.repo}
 RUN git reset --hard
-RUN git checkout {pr.base.sha}
+RUN git checkout {self.pr.base.sha}
 
 RUN npm install -g pnpm@8.6.6
 RUN npm install -g turbo
@@ -149,8 +201,10 @@ RUN npm install -g turbo
 RUN pnpm install || true
 
 {copy_commands}
+
+{self.clear_env}
+
 """
-        return dockerfile_content.format(pr=self.pr, copy_commands=copy_commands)
 
 
 @Instance.register("blitz-js", "blitz_4427_to_4269")
