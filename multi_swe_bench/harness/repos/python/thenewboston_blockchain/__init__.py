@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.python.thenewboston_blockchain.thenewboston_python_client import *
+try:
+    from multi_swe_bench.harness.repos.python.thenewboston_blockchain.thenewboston_python_client import *
+except (ImportError, ModuleNotFoundError):
+    pass

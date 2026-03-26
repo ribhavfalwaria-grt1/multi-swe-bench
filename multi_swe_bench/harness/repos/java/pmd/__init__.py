@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.java.pmd.pmd import *
+try:
+    from multi_swe_bench.harness.repos.java.pmd.pmd import *
+except (ImportError, ModuleNotFoundError):
+    pass

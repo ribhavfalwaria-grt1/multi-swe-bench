@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.golang.grpc.grpc_go import *
+try:
+    from multi_swe_bench.harness.repos.golang.grpc.grpc_go import *
+except (ImportError, ModuleNotFoundError):
+    pass

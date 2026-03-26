@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.javascript.hapijs.hapi import *
+try:
+    from multi_swe_bench.harness.repos.javascript.hapijs.hapi import *
+except (ImportError, ModuleNotFoundError):
+    pass

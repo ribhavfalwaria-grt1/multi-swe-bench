@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.typescript.rjsfteam.reactjsonschemaform import *
+try:
+    from multi_swe_bench.harness.repos.typescript.rjsfteam.reactjsonschemaform import *
+except (ImportError, ModuleNotFoundError):
+    pass

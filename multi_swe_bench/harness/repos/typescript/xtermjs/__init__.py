@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.typescript.xtermjs.xterm_js import *
+try:
+    from multi_swe_bench.harness.repos.typescript.xtermjs.xterm_js import *
+except (ImportError, ModuleNotFoundError):
+    pass

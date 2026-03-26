@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.javascript.carbondesignsystem.carbon import *
+try:
+    from multi_swe_bench.harness.repos.javascript.carbondesignsystem.carbon import *
+except (ImportError, ModuleNotFoundError):
+    pass

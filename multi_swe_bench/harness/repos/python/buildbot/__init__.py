@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.python.buildbot.buildbot_8452_to_6274 import *
+try:
+    from multi_swe_bench.harness.repos.python.buildbot.buildbot_8452_to_6274 import *
+except (ImportError, ModuleNotFoundError):
+    pass

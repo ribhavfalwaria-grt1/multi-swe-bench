@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.python.mindsdb.mindsdb_5748_to_5241 import *
+try:
+    from multi_swe_bench.harness.repos.python.mindsdb.mindsdb_5748_to_5241 import *
+except (ImportError, ModuleNotFoundError):
+    pass

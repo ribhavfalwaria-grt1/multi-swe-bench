@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.javascript.bpmnio.bpmnjs import *
+try:
+    from multi_swe_bench.harness.repos.javascript.bpmnio.bpmnjs import *
+except (ImportError, ModuleNotFoundError):
+    pass

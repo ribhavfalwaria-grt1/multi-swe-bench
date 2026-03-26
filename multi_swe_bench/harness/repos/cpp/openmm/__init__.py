@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.cpp.openmm.openmm import *
+try:
+    from multi_swe_bench.harness.repos.cpp.openmm.openmm import *
+except (ImportError, ModuleNotFoundError):
+    pass

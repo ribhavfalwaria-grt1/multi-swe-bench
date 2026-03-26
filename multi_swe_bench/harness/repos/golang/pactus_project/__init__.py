@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.golang.pactus_project.pactus import *
+try:
+    from multi_swe_bench.harness.repos.golang.pactus_project.pactus import *
+except (ImportError, ModuleNotFoundError):
+    pass

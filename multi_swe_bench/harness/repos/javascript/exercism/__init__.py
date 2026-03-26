@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.javascript.exercism.javascript import *
+try:
+    from multi_swe_bench.harness.repos.javascript.exercism.javascript import *
+except (ImportError, ModuleNotFoundError):
+    pass

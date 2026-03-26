@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.cpp.celeritas_project.celeritas import *
+try:
+    from multi_swe_bench.harness.repos.cpp.celeritas_project.celeritas import *
+except (ImportError, ModuleNotFoundError):
+    pass

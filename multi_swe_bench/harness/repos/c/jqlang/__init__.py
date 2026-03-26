@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.c.jqlang.jq import *
+try:
+    from multi_swe_bench.harness.repos.c.jqlang.jq import *
+except (ImportError, ModuleNotFoundError):
+    pass

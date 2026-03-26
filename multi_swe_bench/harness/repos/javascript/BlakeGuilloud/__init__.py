@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.javascript.BlakeGuilloud.ganon_814_to_7 import *
+try:
+    from multi_swe_bench.harness.repos.javascript.BlakeGuilloud.ganon_814_to_7 import *
+except (ImportError, ModuleNotFoundError):
+    pass

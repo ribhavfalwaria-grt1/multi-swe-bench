@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.java.OpenElements.hiero_enterprise_java import *
+try:
+    from multi_swe_bench.harness.repos.java.OpenElements.hiero_enterprise_java import *
+except (ImportError, ModuleNotFoundError):
+    pass

@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.javascript.dinerojs.dinero_js import *
+try:
+    from multi_swe_bench.harness.repos.javascript.dinerojs.dinero_js import *
+except (ImportError, ModuleNotFoundError):
+    pass

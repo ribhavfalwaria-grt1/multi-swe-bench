@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.cpp.dosbox_staging.dosbox_staging import *
+try:
+    from multi_swe_bench.harness.repos.cpp.dosbox_staging.dosbox_staging import *
+except (ImportError, ModuleNotFoundError):
+    pass

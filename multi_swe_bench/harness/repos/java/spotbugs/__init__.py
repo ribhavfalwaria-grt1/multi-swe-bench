@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.java.spotbugs.spotbugs import *
+try:
+    from multi_swe_bench.harness.repos.java.spotbugs.spotbugs import *
+except (ImportError, ModuleNotFoundError):
+    pass

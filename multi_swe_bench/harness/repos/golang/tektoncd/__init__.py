@@ -1,1 +1,4 @@
-from .pipeline import *
+try:
+    from .pipeline import *
+except (ImportError, ModuleNotFoundError):
+    pass

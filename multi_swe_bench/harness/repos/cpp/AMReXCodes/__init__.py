@@ -1,3 +1,5 @@
 """AMReX repository handler for Multi-SWE-bench"""
-from .amrex import AMReX
-
+try:
+    from .amrex import AMReX
+except (ImportError, ModuleNotFoundError):
+    pass

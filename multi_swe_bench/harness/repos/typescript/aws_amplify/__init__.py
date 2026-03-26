@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.typescript.aws_amplify.amplify_js_14089_to_13938 import *
+try:
+    from multi_swe_bench.harness.repos.typescript.aws_amplify.amplify_js_14089_to_13938 import *
+except (ImportError, ModuleNotFoundError):
+    pass

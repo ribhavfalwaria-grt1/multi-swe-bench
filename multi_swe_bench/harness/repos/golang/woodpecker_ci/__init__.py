@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.golang.woodpecker_ci.woodpecker import *
+try:
+    from multi_swe_bench.harness.repos.golang.woodpecker_ci.woodpecker import *
+except (ImportError, ModuleNotFoundError):
+    pass

@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.java.CatimaLoyalty.Android import *
+try:
+    from multi_swe_bench.harness.repos.java.CatimaLoyalty.Android import *
+except (ImportError, ModuleNotFoundError):
+    pass

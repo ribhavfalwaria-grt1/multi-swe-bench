@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.python.activeloopai.deeplake import *
+try:
+    from multi_swe_bench.harness.repos.python.activeloopai.deeplake import *
+except (ImportError, ModuleNotFoundError):
+    pass

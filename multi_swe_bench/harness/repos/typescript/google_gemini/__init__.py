@@ -1,2 +1,4 @@
-from multi_swe_bench.harness.repos.typescript.google_gemini.gemini_cli import *
-
+try:
+    from multi_swe_bench.harness.repos.typescript.google_gemini.gemini_cli import *
+except (ImportError, ModuleNotFoundError):
+    pass

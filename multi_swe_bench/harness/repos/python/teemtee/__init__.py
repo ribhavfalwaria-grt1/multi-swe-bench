@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.python.teemtee.tmt_3103_to_2000 import *
+try:
+    from multi_swe_bench.harness.repos.python.teemtee.tmt_3103_to_2000 import *
+except (ImportError, ModuleNotFoundError):
+    pass

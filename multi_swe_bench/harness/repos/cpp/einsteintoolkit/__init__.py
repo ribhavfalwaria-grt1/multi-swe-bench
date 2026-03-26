@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.cpp.einsteintoolkit.cactus import *
+try:
+    from multi_swe_bench.harness.repos.cpp.einsteintoolkit.cactus import *
+except (ImportError, ModuleNotFoundError):
+    pass

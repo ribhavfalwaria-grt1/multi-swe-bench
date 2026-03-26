@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.golang.omni_network.omni import *
+try:
+    from multi_swe_bench.harness.repos.golang.omni_network.omni import *
+except (ImportError, ModuleNotFoundError):
+    pass

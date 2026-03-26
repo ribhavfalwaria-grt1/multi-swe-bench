@@ -1,1 +1,4 @@
-from multi_swe_bench.harness.repos.c.redis.redis import *
+try:
+    from multi_swe_bench.harness.repos.c.redis.redis import *
+except (ImportError, ModuleNotFoundError):
+    pass
