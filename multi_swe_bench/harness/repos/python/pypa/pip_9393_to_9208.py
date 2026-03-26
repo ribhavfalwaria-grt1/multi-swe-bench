@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -243,6 +244,7 @@ class PIP_9393_TO_9208(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Regex pattern to match test lines with status
         pattern = r"^(.+?)\s+(PASSED|FAILED|SKIPPED|ERROR|XFAILED|XPASSED)\s+\[\s*\d+%\s*\]$|^(PASSED|FAILED|SKIPPED|ERROR|XFAILED|XPASSED)\s+(.+)$"

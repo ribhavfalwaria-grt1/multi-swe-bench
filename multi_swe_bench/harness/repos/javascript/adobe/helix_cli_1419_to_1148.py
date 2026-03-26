@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -179,6 +180,8 @@ class HELIX_CLI_1419_TO_1148(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
+        import json
 
         # Parse passed tests using ✓ symbol
         passed_pattern = re.compile(r"^\s+✓\s+(.*?)\s+\(\d+ms\)$", re.MULTILINE)

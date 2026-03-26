@@ -1,6 +1,6 @@
 import re
 import json
-from typing import Optional
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -176,6 +176,8 @@ class DECAFFEINATE_1155_TO_1114(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
+        import json
 
         # Extract JSON part from log
         json_match = re.search(r"\{.*\}", log, re.DOTALL)

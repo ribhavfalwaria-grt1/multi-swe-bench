@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -178,6 +179,8 @@ class SVELTE_9282_TO_9124(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
+        import json
 
         test_file_pattern = re.compile(r"✓ (.*?) ")
         failed_test_pattern = re.compile(r"❯ (.*?) ")

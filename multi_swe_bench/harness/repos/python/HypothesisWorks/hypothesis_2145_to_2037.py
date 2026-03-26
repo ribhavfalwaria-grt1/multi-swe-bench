@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -195,6 +196,7 @@ class HYPOTHESIS_2145_TO_2037(Instance):
         passed_tests: set[str] = set()  # Tests that passed successfully
         failed_tests: set[str] = set()  # Tests that failed
         skipped_tests: set[str] = set()  # Tests that were skipped
+        import re
 
         # Regex pattern to match test lines with leading numbers and trailing percentages
         # Regex pattern to match both test_name+status and status+test_name formats

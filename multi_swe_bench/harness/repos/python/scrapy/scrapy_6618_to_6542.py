@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -180,6 +181,7 @@ class SCRAPY_6618_TO_6542(Instance):
         passed_tests = set()  # type: set[str]
         failed_tests = set()  # type: set[str]
         skipped_tests = set()  # type: set[str]
+        import re
 
         # Regex patterns to match test lines
         # Pattern 1: Test name followed by status and percentage (e.g., "test_name PASSED [  0%]")

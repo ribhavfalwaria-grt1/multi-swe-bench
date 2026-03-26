@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -181,6 +182,7 @@ class LCFS_3017_TO_2910(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Regex patterns to match test lines
         # Pattern 1: Test name followed by status and percentage (e.g., "test_name PASSED [  1%]")

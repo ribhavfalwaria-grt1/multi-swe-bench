@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -192,6 +193,7 @@ class FARMBLOCKS_876_TO_678(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Parse passed tests
         passed_pattern = re.compile(r"^\s*✓\s*(.*?)\s*(?:\(\d+ms\))?$", re.MULTILINE)

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -232,6 +233,7 @@ class LISK_DESKTOP_4513_TO_4481(Instance):
         passed_tests: set[str] = set()  # Tests that passed successfully
         failed_tests: set[str] = set()  # Tests that failed
         skipped_tests: set[str] = set()  # Tests that were skipped
+        import re
 
         # Pattern for passed tests: ✓ followed by test name (optional time)
         passed_pattern = re.compile(r"^\s*✓\s+(.*?)\s*(?:\(\d+ ms\))?$", re.MULTILINE)

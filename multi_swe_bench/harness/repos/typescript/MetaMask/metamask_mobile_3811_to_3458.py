@@ -1,7 +1,8 @@
 from typing import Set
 
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -181,6 +182,7 @@ class METAMASK_MOBILE_3811_TO_3458(Instance):
         passed_tests: Set[str] = set()
         failed_tests: Set[str] = set()
         skipped_tests: Set[str] = set()
+        import re
 
         # Regex pattern to match PASS/FAIL/SKIP lines and extract test names
         pattern = re.compile(r"^(PASS|FAIL|SKIP)\s+([^\s(]+)", re.MULTILINE)

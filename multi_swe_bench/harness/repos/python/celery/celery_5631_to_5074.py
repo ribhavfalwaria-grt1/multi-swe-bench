@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -189,6 +190,7 @@ class CELERY_5631_TO_5074(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Regular expression pattern to match test lines
         pattern = r"^(.+?)\s+(PASSED|FAILED|ERROR|SKIPPED)\s+\[\s*\d+%\s*\]$"

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -176,6 +177,8 @@ class JIB_1759_TO_1260(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
+        import json
 
         # Regular expression to find test headers
         if "BUILD FAILURE" in log or "COMPILATION ERROR" in log:

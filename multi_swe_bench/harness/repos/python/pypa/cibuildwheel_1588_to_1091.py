@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -237,6 +238,7 @@ class CIBUILDWHEEL_1588_TO_1091(Instance):
         passed_tests: set[str] = set()
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
+        import re
 
         # Extract passed tests (lines like 'test_name PASSED ...')
         passed_pattern = re.compile(r"^(.*?) PASSED\b", re.MULTILINE)

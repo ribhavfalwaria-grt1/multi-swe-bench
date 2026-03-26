@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -241,6 +242,7 @@ class METAMASK_MOBILE_1481_TO_1060(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         current_suite = None
         # Regex patterns to match test suite and cases

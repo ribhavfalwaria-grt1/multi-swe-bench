@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -248,6 +249,8 @@ class JACKSON_CORE_1178_TO_1171(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
+        import json
 
         # TODO: Implement the parse_log function
         passed_tests_pattern = re.compile(

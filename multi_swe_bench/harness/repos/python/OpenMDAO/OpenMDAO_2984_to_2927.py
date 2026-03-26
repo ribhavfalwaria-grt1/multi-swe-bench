@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -196,6 +197,8 @@ class OPENMDAO_2984_TO_2927(Instance):
         passed_tests = set[str]()
         failed_tests = set[str]()
         skipped_tests = set[str]()
+        import re
+        import json
 
         # Use regex to find all test lines with status
         pattern = re.compile(

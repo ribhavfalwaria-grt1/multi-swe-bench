@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -168,6 +169,7 @@ class SEABORN_3190_TO_3084(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Regex to capture the test status and name
         passed_pattern = re.compile(r"^PASSED\s+(.*)")

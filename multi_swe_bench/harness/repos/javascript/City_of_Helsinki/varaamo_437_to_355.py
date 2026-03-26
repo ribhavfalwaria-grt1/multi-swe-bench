@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -203,6 +204,7 @@ class VARAAMO_437_TO_355(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Remove ANSI escape codes
         log_clean = re.sub(r"\x1B\[[0-9;]*[mK]", "", log)

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -183,6 +184,8 @@ class LIGHTHOUSE_9576_TO_9073(Instance):
         passed_tests = set[str]()  # Tests that passed successfully
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
+        import re
+        import json
 
         # Extract test names and statuses using regex patterns
         # Passed tests: lines starting with "PASS " followed by test file path

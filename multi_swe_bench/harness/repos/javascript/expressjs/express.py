@@ -115,7 +115,7 @@ fi
 echo "check_git_changes: No uncommitted changes"
 exit 0
 
-""".format(),
+""".format(pr=self.pr),
             ),
             File(
                 ".",

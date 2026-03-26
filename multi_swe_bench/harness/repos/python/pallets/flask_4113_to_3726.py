@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -182,6 +183,8 @@ class FLASK_4113_TO_3726(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
+        import json
 
         # tests/test_cli.py::test_show_traces[True-True-True] PASSED
         passed_pattern = re.compile(r"^(tests\/.*::.*) PASSED")

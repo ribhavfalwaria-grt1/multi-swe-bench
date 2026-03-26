@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -180,6 +181,8 @@ class BAT_3068_TO_1971(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
+        import json
 
         for line in log.splitlines():
             match = re.match(r"^test (.*) ... (ok|FAILED|ignored)$", line)

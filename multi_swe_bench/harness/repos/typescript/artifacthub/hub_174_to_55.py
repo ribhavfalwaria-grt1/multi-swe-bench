@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -187,6 +188,7 @@ class HUB_174_TO_55(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
 
         # Pattern to match test status lines (e.g., "--- PASS: TestName (0.00s)")
         status_pattern = r"^\s*--- (\w+): (.*?) \(\d+\.?\d*s\)$"

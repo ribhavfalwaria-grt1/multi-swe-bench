@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -226,6 +227,7 @@ class QIBO_262_TO_204(Instance):
         passed_tests = set()  # type: set[str]
         failed_tests = set()  # type: set[str]
         skipped_tests = set()  # type: set[str]
+        import re
 
         # Implement the log parsing logic here
         pattern = r"(?:(src/[^\s]+)\s+(PASSED|FAILED|SKIPPED)|(PASSED|FAILED|SKIPPED)\s+(src/[^\s]+))"

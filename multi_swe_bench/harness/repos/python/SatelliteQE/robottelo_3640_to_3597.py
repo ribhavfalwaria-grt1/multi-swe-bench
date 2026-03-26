@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -259,6 +260,8 @@ class ROBOTTELO_3640_TO_3597(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
+        import json
 
         pattern = re.compile(
             r"^(tests/.*?)\s+(PASSED|FAILED|SKIPPED)\s*$", re.MULTILINE | re.IGNORECASE

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -195,6 +196,7 @@ class MARIMO_2461_TO_2326(Instance):
         passed_tests = set[str]()
         failed_tests = set[str]()
         skipped_tests = set[str]()
+        import re
 
         # Regex patterns to match test cases with their statuses
         # Pattern 1: Matches lines like "tests/path/to/test.py::TestClass::test_name PASSED [  0%]"

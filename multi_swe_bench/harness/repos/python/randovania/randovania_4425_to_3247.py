@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -276,6 +277,7 @@ class RANDOVANIA_4425_TO_3247(Instance):
         passed_tests: set[str] = set()
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
+        import re
 
         # Pattern to match test status (PASSED, FAILED, SKIPPED) and test name
         pattern = re.compile(

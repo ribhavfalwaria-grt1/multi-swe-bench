@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -458,6 +459,7 @@ class METPY_272_TO_222(Instance):
         passed_tests = set()  # type: set[str]
         failed_tests = set()  # type: set[str]
         skipped_tests = set()  # type: set[str]
+        import re
 
         # Parse test lines using regex
         pattern = r"(?:(PASSED|FAILED|SKIPPED)\s+([\w\/]+\.py::\w+))|(?:([\w\/]+\.py::\w+)\s+(PASSED|FAILED|SKIPPED))"

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -224,6 +225,7 @@ class FEATURETOOLS_1733_TO_1456(Instance):
     def parse_log(self, log: str) -> TestResult:
         # Parse the log content and extract test execution results.
         test_status = {}  # Track latest status for each test
+        import re
 
         # Use regex to find all test cases with their statuses
         pattern = re.compile(

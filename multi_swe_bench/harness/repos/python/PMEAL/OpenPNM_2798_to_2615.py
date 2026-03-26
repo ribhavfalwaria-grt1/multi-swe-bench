@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -192,6 +193,7 @@ class OPENPNM_2798_TO_2615(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
 
         # Pattern 1: test name followed by status (PASSED, FAILED, ERROR)
         pattern1 = re.compile(r"(tests/.*?\.py::\w+::\w+) (PASSED|FAILED|ERROR)")

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -201,6 +202,8 @@ class MANTIDIMAGING_125_TO_90(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
+        import json  # Note: json import may not be needed, but kept as per skeleton
 
         # Regex pattern to match test lines
         pattern = re.compile(r"#\d+\s+([^\(]+?)\s*\([^)]*\)\s*\.\.\.\s*(\w+)")

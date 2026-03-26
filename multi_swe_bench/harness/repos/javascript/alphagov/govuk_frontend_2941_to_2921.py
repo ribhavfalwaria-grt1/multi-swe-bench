@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -193,6 +194,8 @@ class GOVUK_FRONTEND_2941_TO_2921(Instance):
         passed_tests: set[str] = set()  # Tests that passed successfully
         failed_tests: set[str] = set()  # Tests that failed
         skipped_tests: set[str] = set()  # Tests that were skipped
+        import re
+        import json
 
         # Regex patterns to match Jest test results with ANSI color codes
         # Passed tests: green checkmark (✓) followed by dimmed test name

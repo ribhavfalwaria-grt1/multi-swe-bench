@@ -1,7 +1,9 @@
-from typing import Set
+from typing import Dict, Set
 import re
 
-from typing import Optional
+import re
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult

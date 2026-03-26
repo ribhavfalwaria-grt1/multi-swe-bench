@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -175,6 +176,7 @@ class PYMATGEN_3819_TO_3519(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Regular expressions to match test status lines with ANSI codes
         passed_pattern = re.compile(r"\x1b\[32mPASSED\x1b\[0m (.*?)\x1b\[0m")

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -177,6 +178,8 @@ class CODECEPTJS_1066_TO_369(Instance):
         passed_tests = set[str]()  # Tests that passed successfully
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
+        import re
+        import json
 
         # Preprocess log to remove line number prefixes
         processed_log = re.sub(r"^\[\s*\d+\]\s*", "", log, flags=re.MULTILINE)

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -173,6 +174,8 @@ class TYPESCRIPTTOLUA_1654_TO_1220(Instance):
         passed_tests: set[str] = set()
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
+        import re
+        import json
 
         # Parse passed tests (marked with ✓ and time in ms)
         passed_matches = re.findall(r"✓ (.*?) \(\d+ ms\)", log)

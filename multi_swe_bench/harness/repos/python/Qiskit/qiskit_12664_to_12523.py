@@ -1,4 +1,6 @@
-from typing import Optional
+import re
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -182,6 +184,8 @@ class QISKIT_12664_TO_12523(Instance):
         passed_tests: set[str] = set()
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
+        import re
+        import json
 
         for line in log.split("\n"):
             if " ... " in line:

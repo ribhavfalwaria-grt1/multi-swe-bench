@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -261,6 +262,7 @@ class FOUNDRY_VTT_TYPES_1518_TO_1464(Instance):
         passed_tests: set[str] = set()
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
+        import re
 
         # Extract test suite name from log header (e.g., 'foundry-vtt-types' from package line)
         suite_pattern = re.compile(

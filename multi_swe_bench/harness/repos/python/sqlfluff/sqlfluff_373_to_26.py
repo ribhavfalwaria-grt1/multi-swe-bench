@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -180,6 +181,7 @@ class SQLFLUFF_373_TO_26(Instance):
         passed_tests: set[str] = set()  # Tests that passed successfully
         failed_tests: set[str] = set()  # Tests that failed
         skipped_tests: set[str] = set()  # Tests that were skipped
+        import re
 
         # Implement the log parsing logic here
         # Pattern for passed tests: matches lines with line number, test name, PASSED, and percentage

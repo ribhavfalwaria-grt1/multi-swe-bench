@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -208,6 +209,7 @@ class PIP_5764_TO_5457(Instance):
         passed_tests = set[str]()  # Tests that passed successfully
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
+        import re
 
         # Extract all test names from the log
         all_tests = set(re.findall(r"tests/[\w/\.]+::[\w:]+", log))

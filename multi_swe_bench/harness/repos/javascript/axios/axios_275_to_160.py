@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -172,6 +173,8 @@ class AXIOS_275_TO_160(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
+        import json
 
         passed_pattern = re.compile(r"(test[a-zA-Z0-9_]+)\.\.\.OK")
         failed_pattern = re.compile(r"(test[a-zA-Z0-9_]+)\.\.\.Fatal error.*")

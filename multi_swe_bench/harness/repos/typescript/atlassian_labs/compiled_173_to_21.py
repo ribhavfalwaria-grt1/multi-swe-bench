@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -181,6 +182,7 @@ class COMPILED_173_TO_21(Instance):
         skipped_tests = set()
         suite_stack = []
         current_test_name = None
+        import re
 
         # Define regex patterns with flexible matching
         passed_pattern = re.compile(

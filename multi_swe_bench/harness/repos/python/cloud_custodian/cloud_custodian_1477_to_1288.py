@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -211,6 +212,7 @@ class CLOUD_CUSTODIAN_1477_TO_1288(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         pattern = r"(?:\[gw\d+\] \[\s*\d+%\] )?(PASSED|FAILED|SKIPPED)[:\s]+(tests/[\w/\.::\-]+)"  # Allow colon or space after status
         # Capture summary to verify counts

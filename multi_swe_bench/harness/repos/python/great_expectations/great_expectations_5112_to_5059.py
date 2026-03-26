@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -194,6 +195,7 @@ class GREAT_EXPECTATIONS_5112_TO_5059(Instance):
         passed_tests: set[str] = set()
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
+        import re
 
         # Regex patterns to match test lines
         pattern1 = re.compile(r"^(tests/.*?)\s+(PASSED|FAILED|SKIPPED)\s+\[.*?\]$")

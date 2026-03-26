@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -198,6 +199,7 @@ class GREAT_EXPECTATIONS_4524_TO_4458(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
 
         test_status = {}  # Track status of each test to avoid conflicts
         # Parse SKIPPED tests: test name followed by SKIPPED and percentage

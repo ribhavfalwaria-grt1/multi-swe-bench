@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -188,6 +189,7 @@ class BORG_3391_TO_3184(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Regex pattern to match test results (PASSED/SKIPPED/FAILED) with test names
         pattern = r"(?:\[gw\d+\] \[\s*\d+%\] )?(PASSED|SKIPPED|FAILED) (?:\[.*?\] )?(src/.*?)(?:\s|$)"

@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -300,6 +301,7 @@ class PYSTAC_826_TO_406(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
 
         # Pattern for passed tests: lines starting with [number], then test name, (test_id), ... ok
         passed_pattern = re.compile(r"\(([^)]+)\)\s*\.\.\.\s*ok", re.MULTILINE)

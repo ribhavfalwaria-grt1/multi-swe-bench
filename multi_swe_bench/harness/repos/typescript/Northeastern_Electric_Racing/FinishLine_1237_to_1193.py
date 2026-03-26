@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -245,6 +246,8 @@ class FINISHLINE_1237_TO_1193(Instance):
         passed_tests = set[str]()
         failed_tests = set[str]()
         skipped_tests = set[str]()
+        import re
+        import json
 
         # Remove ANSI escape codes
         clean_log = re.sub(r"\x1b\[[0-9;]*m", "", log)

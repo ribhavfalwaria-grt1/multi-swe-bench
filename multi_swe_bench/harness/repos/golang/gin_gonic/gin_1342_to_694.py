@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -220,6 +221,7 @@ class GIN_1342_TO_694(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # τζ What's causing the problem?
         # The current implementation of the `parse_log` function is incomplete and does not extract test results from the log content.

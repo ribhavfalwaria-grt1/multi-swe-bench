@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -171,6 +172,7 @@ class ANT_DESIGN_52448_TO_51636(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Pattern for passed tests: matches "✓ " followed by test name, optional (time)
         passed_pattern = re.compile(r"^  ✓\s+(.+?)(?:\s*\(\d+\s*ms\))?$", re.MULTILINE)

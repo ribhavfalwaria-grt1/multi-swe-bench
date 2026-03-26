@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -244,6 +245,7 @@ class LISK_DESKTOP_5252_TO_5176(Instance):
         passed_tests: set[str] = set()  # Tests that passed successfully
         failed_tests: set[str] = set()  # Tests that failed
         skipped_tests: set[str] = set()  # Tests that were skipped
+        import re
 
         current_suite = None  # Track the current test suite name
         current_block = None  # Track if we're in a FAIL or PASS block

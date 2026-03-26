@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -277,6 +278,8 @@ class OPENHANDS_3099_TO_1660(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
+        import json
 
         # Use regex to find test cases and their statuses
         pattern = r"(\btests/.*?::.*?) (PASSED|FAILED|SKIPPED|ERROR)\b"

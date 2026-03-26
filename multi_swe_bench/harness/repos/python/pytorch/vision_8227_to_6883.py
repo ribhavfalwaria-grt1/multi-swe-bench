@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -185,6 +186,8 @@ class VISION_8227_TO_6883(Instance):
         passed_tests = set[str]()  # Tests that passed successfully
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
+        import re
+        import json
 
         # Use regex to find test lines and extract test names and statuses
         pattern = re.compile(r"(test/.*?)\s+(PASSED|SKIPPED|FAILED)\s+\[\s*\d+%\s*\]")

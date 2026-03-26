@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -181,6 +182,7 @@ class PIPENV_5083_TO_5026(Instance):
         passed_tests = set[str]()
         failed_tests = set[str]()
         skipped_tests = set[str]()
+        import re
 
         # Extract test names using regex patterns
         passed_pattern = re.compile(r"PASSED\s+(tests/[\w/.]+::[\w:-]+(?:\[[^\]]+\])*)")

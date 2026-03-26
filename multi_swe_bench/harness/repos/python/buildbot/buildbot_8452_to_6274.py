@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -200,6 +201,8 @@ class BUILDBOT_8452_TO_6274(Instance):
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
         processed_tests = set()  # Track tests already classified
+        import re
+        import json
 
         lines = log.split("\n")
         hierarchy = []

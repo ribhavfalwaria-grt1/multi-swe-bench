@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -239,6 +240,7 @@ class ROTKI_254_TO_143(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Regex pattern to match test names and their statuses (handles both 'test status' and 'status test' formats)
         pattern = re.compile(

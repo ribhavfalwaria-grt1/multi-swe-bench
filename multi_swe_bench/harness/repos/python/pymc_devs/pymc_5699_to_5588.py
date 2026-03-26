@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -208,6 +209,7 @@ class PYMC_5699_TO_5588(Instance):
         passed_tests = set[str]()
         failed_tests = set[str]()
         skipped_tests = set[str]()
+        import re
 
         # Regex pattern to match test status and name
         pattern = r"\b(PASSED|FAILED|XFAIL)\b\s+([^\s]+)"

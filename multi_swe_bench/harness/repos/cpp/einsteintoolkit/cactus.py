@@ -1,3 +1,4 @@
+import re
 from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image

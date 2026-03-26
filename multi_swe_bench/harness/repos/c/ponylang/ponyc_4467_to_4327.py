@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -176,6 +177,7 @@ class PONYC_4467_TO_4327(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         # Pattern for passed tests
         passed_pattern = re.compile(r"\[\s+OK\s+\]\s+([\w\.-]+)(?:\s+\(\d+\s+ms\))?")

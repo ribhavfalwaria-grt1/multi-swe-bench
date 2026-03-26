@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -176,6 +177,7 @@ class JBROWSE_COMPONENTS_4158_TO_3726(Instance):
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
         # Extract test suite paths (PASS/FAIL) and test cases
+        import re
 
         suite_pattern = re.compile(
             r"^(PASS|FAIL) (.*?)(?: \(\d+\.\d+ s\))?$", re.MULTILINE

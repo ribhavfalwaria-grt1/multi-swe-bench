@@ -1,4 +1,6 @@
-from typing import Optional
+import re
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -170,6 +172,8 @@ class DAYJS_198_TO_94(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
+        import json
 
         for line in log.splitlines():
             if line.startswith("PASS"):

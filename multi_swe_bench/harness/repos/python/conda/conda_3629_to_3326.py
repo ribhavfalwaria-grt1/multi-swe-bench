@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -207,6 +208,7 @@ class CONDA_3629_TO_3326(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
 
         # Extract all valid test names (e.g., tests/module.py::TestClass::test_method or tests/module.py::test_function[param])
         all_tests = set(re.findall(r"tests/[\w/]+\.py::[\w:]+(?:\[\w+\])?", log))

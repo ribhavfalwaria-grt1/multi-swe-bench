@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -218,6 +219,7 @@ class CHARMCRAFT_335_TO_283(Instance):
         passed_tests: set[str] = set()
         failed_tests: set[str] = set()
         skipped_tests: set[str] = set()
+        import re
 
         # Regex patterns to match test cases and their statuses
         # Pattern 1: Matches lines like "tests/test_cmdbase.py::test_commanderror_retcode_default PASSED [  0%]"

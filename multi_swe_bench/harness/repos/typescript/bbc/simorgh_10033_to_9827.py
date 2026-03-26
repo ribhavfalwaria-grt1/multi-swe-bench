@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -202,6 +203,8 @@ class SIMORGH_10033_TO_9827(Instance):
         passed_tests = set[str]()
         failed_tests = set[str]()
         skipped_tests = set[str]()
+        import re
+        import json
 
         # Parse passed tests using regex pattern for green checkmark and dim text
         passed_matches = re.findall(

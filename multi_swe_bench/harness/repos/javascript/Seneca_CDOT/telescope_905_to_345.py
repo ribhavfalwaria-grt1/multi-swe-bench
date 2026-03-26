@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -223,6 +224,7 @@ class TELESCOPE_905_TO_345(Instance):
         passed_tests = set[str]()
         failed_tests = set[str]()
         skipped_tests = set[str]()
+        import re
 
         # Parse test results using regex
         pattern = re.compile(r"^(PASS|FAIL|SKIPPED)\s+([^\s]+)$", re.MULTILINE)

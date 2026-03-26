@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -245,6 +246,7 @@ class OPENSLIDES_BACKEND_1288_TO_1223(Instance):
         passed_tests: set[str] = set()  # Tests that passed successfully
         failed_tests: set[str] = set()  # Tests that failed
         skipped_tests: set[str] = set()  # Tests that were skipped
+        import re
 
         # Pattern for PASSED tests (e.g., "tests/... PASSED [  0%]")
         passed_pattern = re.compile(r"^(tests/.*?) PASSED\s+\[\s*\d+%\]", re.MULTILINE)

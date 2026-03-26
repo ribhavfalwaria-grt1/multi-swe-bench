@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -182,6 +183,8 @@ class VYPER_3398_TO_3304(Instance):
         passed_tests = set[str]()  # Tests that passed successfully
         failed_tests = set[str]()  # Tests that failed
         skipped_tests = set[str]()  # Tests that were skipped
+        import re
+        import json
 
         # Extract progress bar (sequence of .xF) from line with line number
         # Extract progress bar (sequence of .xF) from line with line number, allowing text after

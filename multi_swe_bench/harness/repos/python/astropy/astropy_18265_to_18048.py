@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -185,6 +186,7 @@ class ASTROPY_18265_TO_18048(Instance):
         passed_tests = set()
         failed_tests = set()
         skipped_tests = set()
+        import re
 
         ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
         log_no_ansi = ansi_escape.sub("", log)

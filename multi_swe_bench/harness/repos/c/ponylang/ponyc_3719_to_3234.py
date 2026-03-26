@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+import json
+from typing import Optional, Union
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -196,6 +197,8 @@ class PONYC_3719_TO_3234(Instance):
         passed_tests = set()  # Tests that passed successfully
         failed_tests = set()  # Tests that failed
         skipped_tests = set()  # Tests that were skipped
+        import re
+        import json
 
         gtest_passed_pattern = re.compile(r"\[\s+OK\s+\]\s+([\w\.]+)")
         gtest_run_pattern = re.compile(r"\[\s+RUN\s+\]\s+([\w\.]+)")
