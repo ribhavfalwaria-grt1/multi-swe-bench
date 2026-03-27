@@ -32,8 +32,39 @@ class ImageDefault(Image):
     def workdir(self) -> str:
         return f"pr-{self.pr.number}"
 
+    @staticmethod
+    def _test_files_from_patch(patch: str) -> list[str]:
+        """Extract test file paths from a unified diff patch."""
+        files = []
+        for line in patch.splitlines():
+            if line.startswith("diff --git"):
+                parts = line.split()
+                if len(parts) >= 4:
+                    fpath = parts[3].lstrip("b/")
+                    if fpath.startswith("tests/") and fpath.endswith(".py"):
+                        files.append(fpath)
+        return sorted(set(files))
+
     def files(self) -> list[File]:
         repo_name = self.pr.repo
+
+        # Extract test files from the test patch for scoped test runs.
+        # Fall back to full test suite if no test files found.
+        test_files = self._test_files_from_patch(self.pr.test_patch)
+        test_targets = " ".join(test_files) if test_files else "tests/"
+
+        # Common PATH: system PG 14 before conda pgsql (PG 10.5) to fix
+        # pgtest SQL compatibility (FOR KEY SHARE syntax).
+        path_export = "export PATH=/usr/lib/postgresql/14/bin:/opt/conda/bin:\\$PATH"
+
+        # Common pytest command with scoped test targets
+        pytest_cmd = f"pytest --no-header -rA -v --tb=no -p no:cacheprovider {test_targets}"
+
+        # Run command executed as non-root 'aiida' user (pgtest requires non-root)
+        run_body = (
+            f'{path_export} && cd /home/{repo_name} && ulimit -n 4096 && {pytest_cmd}'
+        )
+
         return [
             File(
                 ".",
@@ -48,129 +79,69 @@ class ImageDefault(Image):
             File(
                 ".",
                 "prepare.sh",
-                """ls
-###ACTION_DELIMITER###
+                f"""#!/bin/bash
+set -e
+
+# Fix corrupt sysconfig CFLAGS on aarch64: the non-conda _sysconfigdata has
+# truncated compiler flags ('-n1' instead of '-mtune=neoverse-n1', etc.)
+# that cause C extension builds (psutil, pymatgen) to fail.
+SYSC=/opt/conda/lib/python3.9/_sysconfigdata__linux_aarch64-linux-gnu.py
+if [ -f "$SYSC" ]; then
+    sed -i "s/'-n1 .2-a+fp16+rcpc+dotprod+crypto '/' '/g" "$SYSC"
+    sed -i "s/'-O2  -n1 '/' '/g" "$SYSC"
+    sed -i "s/' -O2  -n1 '/' '/g" "$SYSC"
+    sed -i "s/'-n1 '/' '/g" "$SYSC"
+    sed -i "s/' -n1 '/' '/g" "$SYSC"
+    sed -i "s/'-O2  -n1 '/' '/g" "$SYSC"
+fi
+find /opt/conda/lib/python3.9/__pycache__ -name '_sysconfigdata*' -delete 2>/dev/null || true
+
+# pgtest needs PG 14+ (conda pgsql has PG 10.5 which lacks FOR KEY SHARE)
+apt-get update && apt-get install -y --no-install-recommends postgresql-14 >/dev/null 2>&1
+
 pip install .[tests]
-###ACTION_DELIMITER###
-echo 'pytest --no-header -rA -v --tb=no -p no:cacheprovider tests/' > test_commands.sh
-###ACTION_DELIMITER###
-cat test_commands.sh
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-service postgresql start
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y postgresql
-###ACTION_DELIMITER###
-pg_ctlcluster 14 main start
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-pip install .[tests,rest]
-###ACTION_DELIMITER###
-verdi quicksetup --non-interactive --profile test --email test@example.com --first-name Test --last-name User --institution TestInst --database-engine postgresql --database-name aiida_test --database-username aiida_test --database-password aiida_test --database-host localhost --database-port 5432
-###ACTION_DELIMITER###
-verdi quicksetup --non-interactive --profile test --email test@example.com --first-name Test --last-name User --institution TestInst --db-engine postgresql --db-name aiida_test --db-username aiida_test --db-password aiida_test --db-host localhost --db-port 5432
-###ACTION_DELIMITER###
-verdi quicksetup --non-interactive --profile test --email test@example.com --first-name Test --last-name User --institution TestInst --db-engine postgresql_psycopg2 --db-name aiida_test --db-username aiida_test --db-password aiida_test --db-host localhost --db-port 5432
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y sudo
-###ACTION_DELIMITER###
-verdi quicksetup --non-interactive --profile test --email test@example.com --first-name Test --last-name User --institution TestInst --db-engine postgresql_psycopg2 --db-name aiida_test --db-username aiida_test --db-password aiida_test --db-host localhost --db-port 5432
-###ACTION_DELIMITER###
-echo 'export AIIDA_PROFILE=test && pytest --no-header -rA -v --tb=no -p no:cacheprovider tests/' > test_commands.sh
-###ACTION_DELIMITER###
-cat test_commands.sh
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-pip install .[tests,rest,atomic_tools]
-###ACTION_DELIMITER###
-pip install pymatgen
-###ACTION_DELIMITER###
-pip install tabulate==0.8.10
-###ACTION_DELIMITER###
-pip install pymatgen==2022.11.7
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y build-essential cython3
-###ACTION_DELIMITER###
-pip install pymatgen==2022.11.7
-###ACTION_DELIMITER###
-pip install cython==0.29.32 && pip install pymatgen==2022.11.7
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y libopenblas-dev liblapack-dev libffi-dev
-###ACTION_DELIMITER###
-pip install --no-build-isolation pymatgen==2022.11.7
-###ACTION_DELIMITER###
-pytest tests/orm/nodes/data/test_jsonable.py -v
-###ACTION_DELIMITER###
-echo -e 'export AIIDA_PROFILE=test\nexport PGDATABASE=aiida_test\nexport PGUSER=aiida_test\nexport PGPASSWORD=aiida_test\nexport PGHOST=localhost\nexport PGPORT=5432\npytest --no-header -rA -v --tb=no -p no:cacheprovider tests/' > test_commands.sh
-###ACTION_DELIMITER###
-echo -e 'export AIIDA_PROFILE=test\nexport PGTEST_DATABASE=aiida_test\nexport PGTEST_USER=aiida_test\nexport PGTEST_PASSWORD=aiida_test\nexport PGTEST_HOST=localhost\nexport PGTEST_PORT=5432\npytest --no-header -rA -v --tb=no -p no:cacheprovider tests/' > test_commands.sh
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-echo -e 'export AIIDA_PROFILE=test\nexport PGTEST_USE_EXISTING=1\nexport PGTEST_DATABASE=aiida_test\nexport PGTEST_USER=aiida_test\nexport PGTEST_PASSWORD=aiida_test\nexport PGTEST_HOST=localhost\nexport PGTEST_PORT=5432\npytest --no-header -rA -v --tb=no -p no:cacheprovider tests/' > test_commands.sh
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-verdi profile show test && bash test_commands.sh
-###ACTION_DELIMITER###
-echo -e '#!/bin/bash\nuseradd -m aiida\nchown -R aiida:aiida /home/aiida-core\nsu - aiida -c "export AIIDA_PROFILE=test\nexport PGTEST_USE_EXISTING=1\nexport PGTEST_DATABASE=aiida_test\nexport PGTEST_USER=aiida_test\nexport PGTEST_PASSWORD=aiida_test\nexport PGTEST_HOST=localhost\nexport PGTEST_PORT=5432\npytest --no-header -rA -v --tb=no -p no:cacheprovider tests/"' > test_commands.sh && chmod +x test_commands.sh && bash test_commands.sh
-###ACTION_DELIMITER###
-echo -e '#!/bin/bash
-useradd -m aiida || true
-chown -R aiida:aiida /home/aiida-core
-su - aiida -c "cd /home/aiida-core && export AIIDA_PROFILE=test && export PGTEST_USE_EXISTING=1 && export PGTEST_DATABASE=aiida_test && export PGTEST_USER=aiida_test && export PGTEST_PASSWORD=aiida_test && export PGTEST_HOST=localhost && export PGTEST_PORT=5432 && pytest --no-header -rA -v --tb=no -p no:cacheprovider tests/"' > test_commands.sh && chmod +x test_commands.sh && bash test_commands.sh
-###ACTION_DELIMITER###
-echo -e '#!/bin/bash
-useradd -m aiida || true
-chown -R aiida:aiida /home/aiida-core
-su - aiida -c "cd /home/aiida-core && ulimit -n 4096 && export AIIDA_PROFILE=test && export PGTEST_USE_EXISTING=1 && export PGTEST_DATABASE=aiida_test && export PGTEST_USER=aiida_test && export PGTEST_PASSWORD=aiida_test && export PGTEST_HOST=localhost && export PGTEST_PORT=5432 && pytest --no-header -rA -v --tb=no -p no:cacheprovider tests/"' > test_commands.sh && chmod +x test_commands.sh && bash test_commands.sh""",
+
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+""",
             ),
             File(
                 ".",
                 "run.sh",
-                """#!/bin/bash
-cd /home/[[REPO_NAME]]
-#!/bin/bash
-useradd -m aiida || true
-chown -R aiida:aiida /home/aiida-core
-su - aiida -c "cd /home/aiida-core && ulimit -n 4096 && export AIIDA_PROFILE=test && export PGTEST_USE_EXISTING=1 && export PGTEST_DATABASE=aiida_test && export PGTEST_USER=aiida_test && export PGTEST_PASSWORD=aiida_test && export PGTEST_HOST=localhost && export PGTEST_PORT=5432 && pytest --no-header -rA -v --tb=no -p no:cacheprovider tests/"
-
-""".replace("[[REPO_NAME]]", repo_name),
+                f"""#!/bin/bash
+cd /home/{repo_name}
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+su - aiida -c "{run_body}"
+""",
             ),
             File(
                 ".",
                 "test-run.sh",
-                """#!/bin/bash
-cd /home/[[REPO_NAME]]
-if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn /home/test.patch; then
+                f"""#!/bin/bash
+cd /home/{repo_name}
+if ! git -C /home/{repo_name} apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-#!/bin/bash
-useradd -m aiida || true
-chown -R aiida:aiida /home/aiida-core
-su - aiida -c "cd /home/aiida-core && ulimit -n 4096 && export AIIDA_PROFILE=test && export PGTEST_USE_EXISTING=1 && export PGTEST_DATABASE=aiida_test && export PGTEST_USER=aiida_test && export PGTEST_PASSWORD=aiida_test && export PGTEST_HOST=localhost && export PGTEST_PORT=5432 && pytest --no-header -rA -v --tb=no -p no:cacheprovider tests/"
-
-""".replace("[[REPO_NAME]]", repo_name),
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+su - aiida -c "{run_body}"
+""",
             ),
             File(
                 ".",
                 "fix-run.sh",
-                """#!/bin/bash
-cd /home/[[REPO_NAME]]
-if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+                f"""#!/bin/bash
+cd /home/{repo_name}
+if ! git -C /home/{repo_name} apply --whitespace=nowarn /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-#!/bin/bash
-useradd -m aiida || true
-chown -R aiida:aiida /home/aiida-core
-su - aiida -c "cd /home/aiida-core && ulimit -n 4096 && export AIIDA_PROFILE=test && export PGTEST_USE_EXISTING=1 && export PGTEST_DATABASE=aiida_test && export PGTEST_USER=aiida_test && export PGTEST_PASSWORD=aiida_test && export PGTEST_HOST=localhost && export PGTEST_PORT=5432 && pytest --no-header -rA -v --tb=no -p no:cacheprovider tests/"
-
-""".replace("[[REPO_NAME]]", repo_name),
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+su - aiida -c "{run_body}"
+""",
             ),
         ]
 
