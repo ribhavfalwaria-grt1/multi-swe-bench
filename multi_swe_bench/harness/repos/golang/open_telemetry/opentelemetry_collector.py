@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Union
+from typing import Optional
 
 from multi_swe_bench.harness.image import Config, File, Image
 from multi_swe_bench.harness.instance import Instance, TestResult
@@ -9,7 +9,13 @@ from multi_swe_bench.harness.pull_request import PullRequest
 _GO_BASE_IMAGE = "golang:1.25"
 
 
-class ImageDefault(Image):
+class OtelCollectorImageBase(Image):
+    """Base image: FROM golang:1.25 + clone repo.
+
+    Shared across ALL opentelemetry-collector PRs.
+    image_tag = "base", workdir = "base".
+    """
+
     def __init__(self, pr: PullRequest, config: Config):
         self._pr = pr
         self._config = config
@@ -24,6 +30,56 @@ class ImageDefault(Image):
 
     def dependency(self) -> str:
         return _GO_BASE_IMAGE
+
+    def image_tag(self) -> str:
+        return "base"
+
+    def workdir(self) -> str:
+        return "base"
+
+    def files(self) -> list[File]:
+        return []
+
+    def dockerfile(self) -> str:
+        if self.config.need_clone:
+            code = f"RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}"
+        else:
+            code = f"COPY {self.pr.repo} /home/{self.pr.repo}"
+
+        return f"""FROM {_GO_BASE_IMAGE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y git
+
+{self.global_env}
+
+WORKDIR /home/
+
+{code}
+
+{self.clear_env}
+
+"""
+
+
+class ImageDefault(Image):
+    """Per-PR image: FROM base → checkout + patches + prepare."""
+
+    def __init__(self, pr: PullRequest, config: Config):
+        self._pr = pr
+        self._config = config
+
+    @property
+    def pr(self) -> PullRequest:
+        return self._pr
+
+    @property
+    def config(self) -> Config:
+        return self._config
+
+    def dependency(self) -> Image:
+        return OtelCollectorImageBase(self.pr, self.config)
 
     def image_prefix(self) -> str:
         return "mswebench"
@@ -256,28 +312,25 @@ bash /home/run_tests_per_module.sh /home/{pr.repo} "$MODULE_LINES"
         ]
 
     def dockerfile(self) -> str:
+        image = self.dependency()
+        name = image.image_name()
+        tag = image.image_tag()
+
         copy_commands = ""
         for file in self.files():
             copy_commands += f"COPY {file.name} /home/\n"
 
-        return f"""FROM {_GO_BASE_IMAGE}
+        return f"""FROM {name}:{tag}
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y git
-
-WORKDIR /home/
-COPY fix.patch /home/
-COPY test.patch /home/
-RUN git clone https://github.com/{self.pr.org}/{self.pr.repo}.git /home/{self.pr.repo}
+{self.global_env}
 
 WORKDIR /home/{self.pr.repo}
-RUN git reset --hard
-RUN git checkout {self.pr.base.sha}
 
 {copy_commands}
 
 RUN bash /home/prepare.sh
+
+{self.clear_env}
 
 """
 
