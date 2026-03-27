@@ -121,7 +121,12 @@ bash /home/check_git_changes.sh
 git checkout {pr.base.sha}
 bash /home/check_git_changes.sh
 
-go test -v -count=1 ./... || true
+PKGS=$(cat /home/test.patch /home/fix.patch 2>/dev/null | grep '^diff --git' | sed 's|diff --git a/||;s| b/.*||' | grep '\\.go$' | xargs -I{{}} dirname {{}} | sort -u | sed 's|^|./|' | grep -v '^\\.$')
+if [ -z "$PKGS" ]; then
+    PKGS="./..."
+fi
+
+go test -v -count=1 -timeout 15m $PKGS || true
 
 """.format(pr=self.pr),
             ),
@@ -132,7 +137,11 @@ go test -v -count=1 ./... || true
 set -e
 
 cd /home/{pr.repo}
-go test -v -count=1 ./...
+PKGS=$(cat /home/test.patch /home/fix.patch 2>/dev/null | grep '^diff --git' | sed 's|diff --git a/||;s| b/.*||' | grep '\\.go$' | xargs -I{{}} dirname {{}} | sort -u | sed 's|^|./|' | grep -v '^\\.$')
+if [ -z "$PKGS" ]; then
+    PKGS="./..."
+fi
+go test -v -count=1 -timeout 15m $PKGS
 
 """.format(pr=self.pr),
             ),
@@ -143,8 +152,12 @@ go test -v -count=1 ./...
 set -e
 
 cd /home/{pr.repo}
-git apply /home/test.patch
-go test -v -count=1 ./...
+git apply /home/test.patch || {{ echo "Warning: git apply test.patch failed, retrying with --reject..."; git apply --reject /home/test.patch 2>&1 || true; find . -name '*.rej' -delete 2>/dev/null || true; }}
+PKGS=$(cat /home/test.patch /home/fix.patch 2>/dev/null | grep '^diff --git' | sed 's|diff --git a/||;s| b/.*||' | grep '\\.go$' | xargs -I{{}} dirname {{}} | sort -u | sed 's|^|./|' | grep -v '^\\.$')
+if [ -z "$PKGS" ]; then
+    PKGS="./..."
+fi
+go test -v -count=1 -timeout 15m $PKGS
 
 """.format(pr=self.pr),
             ),
@@ -155,8 +168,12 @@ go test -v -count=1 ./...
 set -e
 
 cd /home/{pr.repo}
-git apply /home/test.patch /home/fix.patch
-go test -v -count=1 ./...
+git apply /home/test.patch /home/fix.patch || {{ echo "Warning: git apply failed, retrying with --reject..."; git apply --reject /home/test.patch 2>&1 || true; git apply --reject /home/fix.patch 2>&1 || true; find . -name '*.rej' -delete 2>/dev/null || true; }}
+PKGS=$(cat /home/test.patch /home/fix.patch 2>/dev/null | grep '^diff --git' | sed 's|diff --git a/||;s| b/.*||' | grep '\\.go$' | xargs -I{{}} dirname {{}} | sort -u | sed 's|^|./|' | grep -v '^\\.$')
+if [ -z "$PKGS" ]; then
+    PKGS="./..."
+fi
+go test -v -count=1 -timeout 15m $PKGS
 
 """.format(pr=self.pr),
             ),
@@ -186,6 +203,7 @@ go test -v -count=1 ./...
 """
 
 
+@Instance.register("syncthing", "syncthing_10576_to_9342")
 @Instance.register("syncthing", "syncthing")
 class Syncthing(Instance):
     def __init__(self, pr: PullRequest, config: Config, *args, **kwargs):

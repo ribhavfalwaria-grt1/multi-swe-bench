@@ -1,5 +1,6 @@
 from multi_swe_bench.harness.repos.golang.beego import *
 from multi_swe_bench.harness.repos.golang.caddyserver import *
+from multi_swe_bench.harness.repos.golang.evanw import *
 from multi_swe_bench.harness.repos.golang.cli import *
 from multi_swe_bench.harness.repos.golang.etcd_io import *
 from multi_swe_bench.harness.repos.golang.fatedier import *
@@ -45,6 +46,7 @@ from multi_swe_bench.harness.repos.golang.ignite import *
 from multi_swe_bench.harness.repos.golang.kyverno import *
 from multi_swe_bench.harness.repos.golang.thanos_io import *
 from multi_swe_bench.harness.repos.golang.tektoncd import *
+from multi_swe_bench.harness.repos.golang.crossplane import *
 from multi_swe_bench.harness.repos.golang.prometheus_operator import *
 from multi_swe_bench.harness.repos.golang.mattermost import *
 from multi_swe_bench.harness.repos.golang.spf13 import *
@@ -54,4 +56,4 @@ from multi_swe_bench.harness.repos.golang.jackc import *
 from multi_swe_bench.harness.repos.golang.pingcap import *
 from multi_swe_bench.harness.repos.golang.securego import *
 from multi_swe_bench.harness.repos.golang.oauth2_proxy import *
-
+from multi_swe_bench.harness.repos.golang.influxdata import *

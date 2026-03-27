@@ -1,3 +1,4 @@
+from multi_swe_bench.harness.repos.c.curl import *
 from multi_swe_bench.harness.repos.c.facebook import *
 from multi_swe_bench.harness.repos.c.fluent import *
 from multi_swe_bench.harness.repos.c.jqlang import *

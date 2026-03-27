@@ -6,6 +6,7 @@ from multi_swe_bench.harness.repos.cpp.cgal import *
 from multi_swe_bench.harness.repos.cpp.fmtlib import *
 from multi_swe_bench.harness.repos.cpp.halide import *
 from multi_swe_bench.harness.repos.cpp.nlohmann import *
+from multi_swe_bench.harness.repos.cpp.microsoft import *
 from multi_swe_bench.harness.repos.cpp.rootproject import *
 from multi_swe_bench.harness.repos.cpp.simdjson import *
 from multi_swe_bench.harness.repos.cpp.yhirose import *
@@ -18,3 +19,4 @@ from multi_swe_bench.harness.repos.cpp.google import *
 from multi_swe_bench.harness.repos.cpp.msgpack import *
 from multi_swe_bench.harness.repos.cpp.duckdb import *
 from multi_swe_bench.harness.repos.cpp.microsoft import *
+from multi_swe_bench.harness.repos.cpp.ericniebler import *

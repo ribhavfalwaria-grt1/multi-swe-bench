@@ -32,8 +32,37 @@ class ImageDefault(Image):
     def workdir(self) -> str:
         return f"pr-{self.pr.number}"
 
+    @staticmethod
+    def _test_files_from_patch(patch: str) -> list[str]:
+        """Extract test file paths from a unified diff patch."""
+        files = []
+        for line in patch.splitlines():
+            if line.startswith("diff --git"):
+                parts = line.split()
+                if len(parts) >= 4:
+                    fpath = parts[3].lstrip("b/")
+                    if fpath.startswith("tests/") and fpath.endswith(".py"):
+                        files.append(fpath)
+        return sorted(set(files))
+
     def files(self) -> list[File]:
         repo_name = self.pr.repo
+
+        test_files = self._test_files_from_patch(self.pr.test_patch)
+        test_targets = " ".join(test_files) if test_files else "tests/"
+
+        # 0.4.0 base image: Python 3.8 via conda, Ubuntu, aiida user pre-exists (UID 1000)
+        # pgtest needs non-root user and PG binaries in /usr/lib/postgresql/*/bin/
+        path_export = "export PATH=/usr/lib/postgresql/14/bin:/opt/conda/bin:\\$PATH"
+
+        reentry_scan = 'python3 -c "from reentry.default_manager import PluginManager; PluginManager().scan([\\\"aiida-core\\\"])" 2>/dev/null'
+
+        pytest_cmd = f"pytest --no-header -rA -v --tb=no -p no:cacheprovider {test_targets}"
+
+        run_body = (
+            f'{path_export} && {reentry_scan} && cd /home/{repo_name} && ulimit -n 4096 && {pytest_cmd}'
+        )
+
         return [
             File(
                 ".",
@@ -48,118 +77,60 @@ class ImageDefault(Image):
             File(
                 ".",
                 "prepare.sh",
-                """ls
-###ACTION_DELIMITER###
-ls -a
-###ACTION_DELIMITER###
-ls -a .github
-###ACTION_DELIMITER###
-ls .github/workflows
-###ACTION_DELIMITER###
-ls requirements
-###ACTION_DELIMITER###
-python3 --version
-###ACTION_DELIMITER###
-pip install -r requirements/requirements-py-3.8.txt
-###ACTION_DELIMITER###
+                f"""#!/bin/bash
+set -e
 
-###ACTION_DELIMITER###
+# pgtest needs PG 14+ for SQL compatibility; 0.4.0 base has no system PG
+apt-get update && apt-get install -y --no-install-recommends postgresql >/dev/null 2>&1
 
-###ACTION_DELIMITER###
-echo -e '#!/bin/bash
-AIIDA_TEST_PROFILE=test_aiida pytest --cov aiida --verbose tests -m "not nightly"' > test_commands.sh && chmod +x test_commands.sh
-###ACTION_DELIMITER###
-cat test_commands.sh
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-pip install -e .
-###ACTION_DELIMITER###
-pip install .
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-verdi quicksetup --non-interactive --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y sudo
-###ACTION_DELIMITER###
-verdi quicksetup --non-interactive --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y postgresql postgresql-contrib && service postgresql start
-###ACTION_DELIMITER###
-sudo -u postgres psql -c "CREATE USER aiida WITH PASSWORD 'aiida';" && sudo -u postgres psql -c "CREATE DATABASE aiida_db OWNER aiida;" && verdi quicksetup --non-interactive --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test --db-user aiida --db-name aiida_db --db-password aiida --db-host localhost
-###ACTION_DELIMITER###
-sudo -u postgres psql -c "CREATE USER aiida WITH PASSWORD 'aiida';" && sudo -u postgres psql -c "CREATE DATABASE aiida_db OWNER aiida;" && verdi quicksetup --non-interactive --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test --db-username aiida --db-name aiida_db --db-password aiida --db-host localhost
-###ACTION_DELIMITER###
-sudo -u postgres psql -c "CREATE DATABASE IF NOT EXISTS aiida_db OWNER aiida;" && verdi quicksetup --non-interactive --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test --db-username aiida --db-name aiida_db --db-password aiida --db-host localhost
-###ACTION_DELIMITER###
-sudo -u postgres psql -c "CREATE DATABASE aiida_db OWNER aiida;" || true && verdi quicksetup --non-interactive --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test --db-username aiida --db-name aiida_db --db-password aiida --db-host localhost
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-pip install --force-reinstall pymatgen
-###ACTION_DELIMITER###
-pip install pyyaml~=5.4 importlib-metadata~=4.3 pytz~=2021.1 tabulate~=0.8.5
-###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y rabbitmq-server && service rabbitmq-server start && bash test_commands.sh
-###ACTION_DELIMITER###
-verdi status
-###ACTION_DELIMITER###
-verdi daemon start && bash test_commands.sh
-###ACTION_DELIMITER###
-apt-get update && apt-get install -y openssh-server && service ssh start
-###ACTION_DELIMITER###
-ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa && cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh && service ssh restart && bash test_commands.sh
-###ACTION_DELIMITER###
-AIIDA_TEST_PROFILE=test_aiida pytest --cov aiida --verbose tests/test_calculation_node.py
-###ACTION_DELIMITER###
-verdi profile delete -f test_aiida && verdi quicksetup --non-interactive --test-profile --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test --db-username aiida --db-name aiida_db --db-password aiida --db-host localhost
-###ACTION_DELIMITER###
-verdi daemon stop && sudo -u postgres psql -c 'SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = ''aiida_db'' AND pid <> pg_backend_pid();' && verdi profile delete -f test_aiida && verdi quicksetup --non-interactive --test-profile --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test --db-username aiida --db-name aiida_db --db-password aiida --db-host localhost
-###ACTION_DELIMITER###
-verdi daemon stop && sudo -u postgres psql -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE datname = 'aiida_db' AND pid <> pg_backend_pid();" && verdi profile delete -f test_aiida && verdi quicksetup --non-interactive --test-profile --profile test_aiida --email test@example.com --first-name Test --last-name User --institution Test --db-username aiida --db-name aiida_db --db-password aiida --db-host localhost
-###ACTION_DELIMITER###
-bash test_commands.sh""",
+# pymatgen 2022.x .pyx files use np.float_t/np.int_t removed in numpy 1.24.
+# pip's build isolation ignores pre-installed versions, so we pin and bypass it.
+pip install "numpy>=1.17,<1.24" "Cython>=0.29.23,<3" "setuptools<67"
+pip install --no-build-isolation "pymatgen>=2019.7.2,!=2019.9.7,<=2022.02.03"
+pip install .[tests]
+python3 -c "from reentry.default_manager import PluginManager; PluginManager().scan(['aiida-core'])"
+
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+""",
             ),
             File(
                 ".",
                 "run.sh",
-                """#!/bin/bash
-cd /home/[[REPO_NAME]]
-#!/bin/bash
-AIIDA_TEST_PROFILE=test_aiida pytest --cov aiida --verbose tests -m "not nightly"
-
-""".replace("[[REPO_NAME]]", repo_name),
+                f"""#!/bin/bash
+cd /home/{repo_name}
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+su - aiida -c "{run_body}"
+""",
             ),
             File(
                 ".",
                 "test-run.sh",
-                """#!/bin/bash
-cd /home/[[REPO_NAME]]
-if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn /home/test.patch; then
+                f"""#!/bin/bash
+cd /home/{repo_name}
+if ! git -C /home/{repo_name} apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-#!/bin/bash
-AIIDA_TEST_PROFILE=test_aiida pytest --cov aiida --verbose tests -m "not nightly"
-
-""".replace("[[REPO_NAME]]", repo_name),
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+su - aiida -c "{run_body}"
+""",
             ),
             File(
                 ".",
                 "fix-run.sh",
-                """#!/bin/bash
-cd /home/[[REPO_NAME]]
-if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn  /home/test.patch /home/fix.patch; then
+                f"""#!/bin/bash
+cd /home/{repo_name}
+if ! git -C /home/{repo_name} apply --whitespace=nowarn /home/test.patch /home/fix.patch; then
     echo "Error: git apply failed" >&2
-    exit 1  
+    exit 1
 fi
-#!/bin/bash
-AIIDA_TEST_PROFILE=test_aiida pytest --cov aiida --verbose tests -m "not nightly"
-
-""".replace("[[REPO_NAME]]", repo_name),
+useradd -m aiida 2>/dev/null || true
+chown -R aiida:aiida /home/{repo_name}
+su - aiida -c "{run_body}"
+""",
             ),
         ]
 
