@@ -56,7 +56,9 @@ apt-get update && apt-get install -y make gcc python3-dev
 ###ACTION_DELIMITER###
 make deps-ubuntu
 ###ACTION_DELIMITER###
-make install-dev
+pip install setuptools memory_profiler sparklines
+###ACTION_DELIMITER###
+for mod in ocrd_utils ocrd_models ocrd_modelfactory ocrd_validators ocrd; do pip install --no-build-isolation -e $mod; done
 ###ACTION_DELIMITER###
 pip install -r requirements_test.txt
 ###ACTION_DELIMITER###
@@ -71,20 +73,14 @@ set -e
 pytest -v --durations=10 --ignore-glob="tests/**/*bench*.py" tests
 cd ocrd_utils && pytest -v --continue-on-collection-errors -k TestLogging tests' > test_commands.sh
 ###ACTION_DELIMITER###
-bash test_commands.sh
-###ACTION_DELIMITER###
-make assets
-###ACTION_DELIMITER###
-bash test_commands.sh""",
+make assets""",
             ),
             File(
                 ".",
                 "run.sh",
                 """#!/bin/bash
 cd /home/[[REPO_NAME]]
-#!/bin/bash
-set -e
-pytest -v --durations=10 --ignore-glob="tests/**/*bench*.py" tests
+pytest -v --continue-on-collection-errors --durations=10 --ignore-glob="tests/**/*bench*.py" tests
 cd ocrd_utils && pytest -v --continue-on-collection-errors -k TestLogging tests
 
 """.replace("[[REPO_NAME]]", repo_name),
@@ -98,9 +94,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-#!/bin/bash
-set -e
-pytest -v --durations=10 --ignore-glob="tests/**/*bench*.py" tests
+pytest -v --continue-on-collection-errors --durations=10 --ignore-glob="tests/**/*bench*.py" tests
 cd ocrd_utils && pytest -v --continue-on-collection-errors -k TestLogging tests
 
 """.replace("[[REPO_NAME]]", repo_name),
@@ -114,9 +108,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn  /home/test.patch /hom
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-#!/bin/bash
-set -e
-pytest -v --durations=10 --ignore-glob="tests/**/*bench*.py" tests
+pytest -v --continue-on-collection-errors --durations=10 --ignore-glob="tests/**/*bench*.py" tests
 cd ocrd_utils && pytest -v --continue-on-collection-errors -k TestLogging tests
 
 """.replace("[[REPO_NAME]]", repo_name),
@@ -204,7 +196,7 @@ class CORE_1107_TO_768(Instance):
         import json
 
         # Regex pattern to match test result lines
-        pattern = r"^(tests/.+\.py::\w+::[^\s]+)\s+(PASSED|FAILED|SKIPPED)(?:\s+\[\s*\d+%\s*\])?"
+        pattern = r"^(tests/.+\.py::[^\s]+)\s+(PASSED|FAILED|SKIPPED)(?:\s+\[\s*\d+%\s*\])?"
         for line in log.split("\n"):
             line = line.strip()
             match = re.match(pattern, line)

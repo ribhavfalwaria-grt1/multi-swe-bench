@@ -58,24 +58,27 @@ make deps-test
 ###ACTION_DELIMITER###
 make assets
 ###ACTION_DELIMITER###
-make test
+pip install setuptools
 ###ACTION_DELIMITER###
-make install
+for mod in ocrd_utils ocrd_models ocrd_modelfactory ocrd_validators ocrd; do pip install --no-build-isolation -e $mod; done
 ###ACTION_DELIMITER###
-make install-dev
+for pkg in ocrd_utils ocrd_models ocrd_modelfactory ocrd_validators ocrd; do
+  PKG_DIR=$(python3 -c "import importlib;s=importlib.util.find_spec('$pkg');print(list(s.submodule_search_locations)[0] if s.submodule_search_locations else '')")
+  if [ -n "$PKG_DIR" ] && [ ! -f "$PKG_DIR/__init__.py" ]; then
+    echo "from ${pkg}.${pkg} import *" > "$PKG_DIR/__init__.py"
+  fi
+done
 ###ACTION_DELIMITER###
 pytest -v tests/
 ###ACTION_DELIMITER###
-echo 'pytest -v tests/' > test_commands.sh
-###ACTION_DELIMITER###
-bash test_commands.sh""",
+echo 'pytest -v tests/' > test_commands.sh""",
             ),
             File(
                 ".",
                 "run.sh",
                 """#!/bin/bash
 cd /home/[[REPO_NAME]]
-pytest -v tests/
+pytest -v --continue-on-collection-errors tests/
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -88,7 +91,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn /home/test.patch; then
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-pytest -v tests/
+pytest -v --continue-on-collection-errors tests/
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
@@ -101,7 +104,7 @@ if ! git -C /home/[[REPO_NAME]] apply --whitespace=nowarn  /home/test.patch /hom
     echo "Error: git apply failed" >&2
     exit 1  
 fi
-pytest -v tests/
+pytest -v --continue-on-collection-errors tests/
 
 """.replace("[[REPO_NAME]]", repo_name),
             ),
