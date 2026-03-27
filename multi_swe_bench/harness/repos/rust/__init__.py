@@ -2,6 +2,7 @@ from multi_swe_bench.harness.repos.rust.alacritty import *
 from multi_swe_bench.harness.repos.rust.bee_san import *
 from multi_swe_bench.harness.repos.rust.bitcoindevkit import *
 from multi_swe_bench.harness.repos.rust.boa_dev import *
+from multi_swe_bench.harness.repos.rust.casey import *
 from multi_swe_bench.harness.repos.rust.BurntSushi import *
 from multi_swe_bench.harness.repos.rust.clap_rs import *
 from multi_swe_bench.harness.repos.rust.fedimint import *
